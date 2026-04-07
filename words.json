@@ -1,0 +1,505 @@
+[
+  {
+    "en": "space",
+    "zh": "太空;空间",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "universe",
+    "zh": "宇宙;体系",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "spacious",
+    "zh": "宽敞的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "unite",
+    "zh": "联合;团结",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reunite",
+    "zh": "重逢;相聚",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "union",
+    "zh": "协会;工会",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "diverse",
+    "zh": "不同的;多样的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "anniversary",
+    "zh": "周年纪念日",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "annual",
+    "zh": "每年的;年度的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "convert",
+    "zh": "转变;转换",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "convert",
+    "zh": "改变信仰者",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reverse",
+    "zh": "逆转;撤销",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reverse",
+    "zh": "相反的;反向的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reverse",
+    "zh": "逆转;倒挡",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "controversy",
+    "zh": "争议;争论",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "contrary",
+    "zh": "相对立的;相反的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "contrary",
+    "zh": "相反的事实",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "contrast",
+    "zh": "差异;对比",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "contrast",
+    "zh": "对比;对照",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "nasty",
+    "zh": "令人厌恶的;严重的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "astronaut",
+    "zh": "宇航员;航天员",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "heaven",
+    "zh": "天堂;天空",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "satellite",
+    "zh": "卫星;人造卫星",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "moon",
+    "zh": "月亮;月球",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "Unite 1",
+    "zh": "Lesson1",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "develop",
+    "zh": "开发;发展",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "evolve",
+    "zh": "演变;进化",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "revolve",
+    "zh": "旋转;环绕",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "involve",
+    "zh": "涉及;包含",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "advance",
+    "zh": "进展;进步",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "advance",
+    "zh": "进步;前进",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "ahead",
+    "zh": "向前;领先",
+    "pos": "adv",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "ongoing",
+    "zh": "继续进行的;不断发展的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "improve",
+    "zh": "改进;改善",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "approve",
+    "zh": "批准;赞成",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "proof",
+    "zh": "证据;证明",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "proof",
+    "zh": "能抵御的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "enhance",
+    "zh": "提高;增强",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "enable",
+    "zh": "使能够;使成为可能",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "enlarge",
+    "zh": "扩大;扩展",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "enrich",
+    "zh": "充实;使丰富",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "fasten",
+    "zh": "扎牢;扣住",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "tight",
+    "zh": "牢固的;紧的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "tight",
+    "zh": "紧紧地;牢固地",
+    "pos": "adv",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "buckle",
+    "zh": "扣住;扣紧",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "buckle",
+    "zh": "搭扣;锁扣",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "watertight",
+    "zh": "不透水的;防水的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "loose",
+    "zh": "释放;松开",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "loose",
+    "zh": "未固定牢的;自由的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "undo",
+    "zh": "打开;解开",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "form",
+    "zh": "形式;表格",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "form",
+    "zh": "组成;形成",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "formal",
+    "zh": "正式的;庄重的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "uniform",
+    "zh": "校服;制服",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "uniform",
+    "zh": "统一的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "formation",
+    "zh": "形成;组成",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reform",
+    "zh": "改革;改善",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "reform",
+    "zh": "改革;改善",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "format",
+    "zh": "总体安排;计划",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "format",
+    "zh": "格式化",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "conform",
+    "zh": "遵守;顺从",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "comply",
+    "zh": "遵守;顺从",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "formulate",
+    "zh": "确切表达;认真阐述",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "formula",
+    "zh": "公式;方程式",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "program(me)",
+    "zh": "计划;程序",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "program(me)",
+    "zh": "编写程序;预设",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "perform",
+    "zh": "做;执行",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "drill",
+    "zh": "钻(孔);训练",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "drill",
+    "zh": "钻头;演习",
+    "pos": "n",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "inform",
+    "zh": "通知;告知",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "notify",
+    "zh": "通报;通知",
+    "pos": "v",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  },
+  {
+    "en": "noticeable",
+    "zh": "显著的;显而易见的",
+    "pos": "adj",
+    "unit": "Unit 1",
+    "lesson": "Lesson 1"
+  }
+]

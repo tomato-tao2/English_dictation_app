@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>英语单词听写</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-dictation">
+  <div class="page-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>英语单词听写</h1>
+      </div>
+      {% if show_logout %}
+      <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+      {% endif %}
+    </header>
+
+    <section class="hero-banner" aria-label="欢迎与扩展入口">
+      <div class="hero-blobs" aria-hidden="true">
+        <span class="hero-blob hero-blob--a"></span>
+        <span class="hero-blob hero-blob--b"></span>
+        <span class="hero-blob hero-blob--c"></span>
+      </div>
+      <div class="hero-inner">
+        <div class="hero-art" aria-hidden="true">
+          <svg class="hero-svg" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="heroBookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#1b6b5c" />
+                <stop offset="100%" style="stop-color:#3d9b87" />
+              </linearGradient>
+            </defs>
+            <path class="hero-book" fill="url(#heroBookGrad)" d="M18 22h38c4 0 8 3 10 7 2-4 6-7 10-7h38v58H76c-5 0-9 4-10 9-1-5-5-9-10-9H18V22z" opacity="0.92" />
+            <path fill="#fffcf7" d="M56 28h8v44h-8c-3 0-5-2-5-5V33c0-3 2-5 5-5z" />
+            <path class="hero-page" fill="none" stroke="#e5dfd4" stroke-width="1.2" d="M24 34h26M24 44h22M24 54h24" />
+            <g class="hero-waves" fill="none" stroke="#1b6b5c" stroke-width="2.2" stroke-linecap="round">
+              <path class="hero-wave hero-wave--1" d="M88 38c6 0 6 10 0 10s-6-10 0-10" />
+              <path class="hero-wave hero-wave--2" d="M98 32c9 0 9 22 0 22s-9-22 0-22" />
+              <path class="hero-wave hero-wave--3" d="M108 38c6 0 6 10 0 10s-6-10 0-10" />
+            </g>
+          </svg>
+        </div>
+        <div class="hero-copy">
+          <p class="hero-lead">每天几分钟，耳朵跟着词走。</p>
+          <p class="hero-sub">听写、录入都在这一页；以后还会挂上更多学习小工具。</p>
+          <div class="hero-chips">
+            <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">错题回顾</button>
+            <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">学习统计</button>
+            <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">词表导出</button>
+            <a class="hero-chip hero-chip--link" href="#word-import">去录入单词</a>
+          </div>
+        </div>
+      </div>
+      <aside class="hero-ad" aria-label="预留展示位">
+        <span class="hero-ad-label">广告位招租</span>
+        <span class="hero-ad-dot">·</span>
+        <span class="hero-ad-text">合作展示、友情链接或活动通知都可放在这里；需要跳转外链时把本行改成链接即可。</span>
+      </aside>
+    </section>
+
+    <section class="card panel-settings">
+      <h2 class="card-title">听写设置</h2>
+      <div class="row">
+        <label>模式</label>
+        <label><input type="radio" name="mode" value="manual" checked /> 手动</label>
+        <label><input type="radio" name="mode" value="auto" /> 自动</label>
+      </div>
+      <div class="row">
+        <label>听写方式</label>
+        <label><input type="radio" name="dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
+        <label><input type="radio" name="dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+      </div>
+      <div class="row grid-3">
+        <div>
+          <label for="unit">单元</label>
+          <select id="unit"></select>
+        </div>
+        <div>
+          <label for="lesson">部分</label>
+          <select id="lesson"></select>
+        </div>
+        <div>
+          <label for="interval">间隔（秒）</label>
+          <input type="number" id="interval" min="1" value="10" />
+        </div>
+      </div>
+      <p class="meta" id="progress">进度：—</p>
+      <p class="meta muted" id="lastProgress"></p>
+      <div class="resume-toolbar">
+        <button type="button" class="btn-outline btn-resume-last" id="btnResumeLast">继续上次</button>
+        <span class="history-link" id="btnHistoryToggle" role="button" tabindex="0" aria-expanded="false">历史记录</span>
+      </div>
+      <div id="historyPanel" class="history-panel hidden">
+        <ul id="historyList" class="history-list"></ul>
+      </div>
+    </section>
+
+    <section class="card panel-actions">
+      <h2 class="card-title">操作</h2>
+      <div class="actions">
+        <button type="button" id="btnStart">开始</button>
+        <button type="button" id="btnNext">下一个</button>
+        <button type="button" id="btnReplay">重播题目</button>
+        <button type="button" id="btnHint">播报提示</button>
+        <button type="button" id="btnPause">暂停</button>
+        <button type="button" class="btn-outline" id="btnExit" title="退出听写并记忆当前单词">退出</button>
+        <button type="button" class="btn-outline" id="btnGotoImport" title="跳转到录入区域">录入单词</button>
+      </div>
+      <p class="status" id="status">就绪</p>
+    </section>
+
+    <section class="card panel-import" id="word-import">
+      <h2 class="card-title">录入单词</h2>
+      <p class="import-hint">新词会写入 <code>words.json</code>（与程序同目录）。保存后上方「进度」计数会自动刷新。</p>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="single" role="tab" aria-selected="true">单个添加</button>
+        <button type="button" class="tab" data-tab="batch" role="tab" aria-selected="false">批量粘贴</button>
+        <button type="button" class="tab" data-tab="csv" role="tab" aria-selected="false">CSV 文件</button>
+      </div>
+      <div id="tab-single" class="tab-panel" role="tabpanel">
+        <div class="field-row">
+          <label for="addEn">英文</label>
+          <input type="text" id="addEn" autocomplete="off" placeholder="例如 abandon" />
+        </div>
+        <div class="field-row">
+          <label for="addPos">词性（可选）</label>
+          <input type="text" id="addPos" autocomplete="off" placeholder="例如 v." />
+        </div>
+        <div class="field-row">
+          <label for="addZh">中文释义</label>
+          <input type="text" id="addZh" autocomplete="off" placeholder="例如 放弃；抛弃" />
+        </div>
+        <p class="import-hint">同一单词不同词性会分别保存；重复「英文 + 词性 + 单元 + 部分」则跳过。</p>
+        <button type="button" class="btn-secondary" id="btnSaveSingle">保存到词库</button>
+      </div>
+      <div id="tab-batch" class="tab-panel hidden" role="tabpanel">
+        <p class="import-hint">每行一条。推荐：<code>英文,词性,中文;义项2</code>（例：<code>convert,v,转变;转换</code>）。也支持在批量里写 <code>unit1lesson1</code>、<code>lesson2</code> 等段落头切换单元/部分。</p>
+        <textarea id="batchText" placeholder="abandon,v,放弃;抛弃"></textarea>
+        <p class="import-hint" style="margin-top:8px">也支持「英文,词性.中文」或仅「英文,中文」。</p>
+        <button type="button" class="btn-secondary" id="btnSaveBatch">解析并加入词库</button>
+      </div>
+      <div id="tab-csv" class="tab-panel hidden" role="tabpanel">
+        <p class="import-hint">从豆包等导出的 CSV：表头建议含英文、中文；若有词性可加一列。也支持无表头两列或三列。</p>
+        <input type="file" id="csvFile" accept=".csv,.txt" />
+        <p class="import-hint" style="margin-top:10px">请使用 UTF-8 编码。</p>
+        <button type="button" class="btn-secondary" id="btnSaveCsv">上传并导入</button>
+      </div>
+      <p class="import-msg" id="importMsg" aria-live="polite"></p>
+    </section>
+
+    <section class="card panel-tips">
+      <h2 class="card-title">使用说明</h2>
+      <ul class="tips-list">
+        <li>语音使用 Edge 神经语音；每条文案<strong>首次</strong>需联网合成，之后会缓存在服务器 <code>tts_cache</code> 文件夹。</li>
+        <li>听写方式请在点击「开始」前选好。<strong>手动</strong>：可按<strong>空格键</strong>（不在输入框内时）或「下一个」进入下一题。<strong>自动</strong>：题目播完后按设定秒数进入下一题，可用「暂停」/「继续」。</li>
+        <li>「重播题目」会再播两遍当前题；「播报提示」会读出答案一侧（与题目相反：英文 ↔ 中文）。播报中文时只读中文义项，不读词性；义项里的分号在语音中会读成逗号停顿。</li>
+        <li>「录入单词」中，未写单元/部分的词条会归入当前听写设置里所选的单元与部分（若选「全部」则默认 Unit 1 / Lesson 1）。</li>
+      </ul>
+    </section>
+
+    <p class="footer-note">修改词库后刷新本页即可加载最新单词。</p>
+
+    <audio id="player" preload="none"></audio>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status");
+    const progressEl = $("progress");
+    const importMsg = $("importMsg");
+    const historyList = $("historyList");
+    const player = $("player");
+
+    let autoTimer = null;
+    let sessionMode = "manual";
+    let autoPaused = false;
+    let sessionActive = false;
+
+    function setDictationModeDisabled(disabled) {
+      document.querySelectorAll('input[name="dictation_mode"]').forEach((el) => {
+        el.disabled = !!disabled;
+      });
+    }
+
+    function syncModeRadioSelection() {
+      const selected = document.querySelector(`input[name="mode"][value="${sessionMode}"]`);
+      if (selected) selected.checked = true;
+    }
+
+    function updateModeControlsState() {
+      const locked = sessionActive && sessionMode === "auto" && !autoPaused;
+      document.querySelectorAll('input[name="mode"]').forEach((el) => {
+        el.disabled = locked;
+      });
+    }
+
+    function setStatus(t) { statusEl.textContent = t; }
+
+    function setImportMsg(text, ok) {
+      importMsg.textContent = text || "";
+      importMsg.className = "import-msg" + (text ? (ok ? " ok" : " err") : "");
+    }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, {
+        method: opts.method || "GET",
+        headers: { "Content-Type": "application/json", ...opts.headers },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        credentials: "same-origin",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || r.statusText);
+      return data;
+    }
+
+    function clearAutoTimer() {
+      if (autoTimer) {
+        clearTimeout(autoTimer);
+        autoTimer = null;
+      }
+    }
+
+    function playUrls(urls, onDone) {
+      if (!urls || !urls.length) {
+        if (onDone) onDone();
+        return;
+      }
+      let i = 0;
+      function step() {
+        if (i >= urls.length) {
+          if (onDone) onDone();
+          return;
+        }
+        player.src = urls[i];
+        i += 1;
+        player.onended = step;
+        player.play().catch((e) => setStatus("无法播放音频：" + e.message));
+      }
+      step();
+    }
+
+    function scheduleAutoNext() {
+      clearAutoTimer();
+      if (!sessionActive) return;
+      if (sessionMode !== "auto" || autoPaused) return;
+      const sec = parseInt($("interval").value, 10) || 10;
+      autoTimer = setTimeout(async () => {
+        autoTimer = null;
+        if (!sessionActive) return;
+        if (autoPaused || sessionMode !== "auto") return;
+        try {
+          const d = await api("/api/next", { method: "POST" });
+          setStatus(d.status || "");
+          progressEl.textContent = "进度：" + (d.total ? (d.index + 1) + "/" + d.total : "—");
+          if (d.done) {
+            sessionActive = false;
+            return;
+          }
+          playUrls(d.audio_urls, () => {
+            if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+          });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      }, sec * 1000);
+    }
+
+    async function loadConfig() {
+      const c = await api("/api/config");
+      $("lastProgress").textContent = c.last_progress || "";
+      const unitSel = $("unit");
+      const lessonSel = $("lesson");
+      unitSel.innerHTML = "";
+      c.units.forEach((u) => {
+        const o = document.createElement("option");
+        o.value = u;
+        o.textContent = u;
+        if (u === c.unit) o.selected = true;
+        unitSel.appendChild(o);
+      });
+      lessonSel.innerHTML = "";
+      c.lessons.forEach((l) => {
+        const o = document.createElement("option");
+        o.value = l;
+        o.textContent = l;
+        if (l === c.lesson) o.selected = true;
+        lessonSel.appendChild(o);
+      });
+      const modeEl = document.querySelector(`input[name="mode"][value="${c.mode}"]`);
+      if (modeEl) modeEl.checked = true;
+      const dmEl = document.querySelector(`input[name="dictation_mode"][value="${c.dictation_mode}"]`);
+      if (dmEl) dmEl.checked = true;
+      $("interval").value = c.interval;
+      progressEl.textContent = c.word_count ? "进度：0/" + c.word_count : "进度：0/0";
+      renderHistory(c.history || []);
+    }
+
+    function historyText(it) {
+      const ts = it.ts || "";
+      const unit = it.unit || "全部单元";
+      const lesson = it.lesson || "全部部分";
+      const en = it.word_en || "";
+      const zh = it.word_zh || "";
+      const st = it.status === "completed" ? "完成" : "退出";
+      return `${ts}｜${unit} / ${lesson}｜${st}${en || zh ? `｜${en}${zh ? " / " + zh : ""}` : ""}`;
+    }
+
+    async function resumeWithPayload(d) {
+      sessionActive = true;
+      const s = readSettings();
+      sessionMode = s.mode;
+      $("btnPause").textContent = "暂停";
+      $("unit").value = d.unit;
+      $("lesson").value = d.lesson;
+      setDictationModeDisabled(true);
+      updateModeControlsState();
+      setStatus(d.status || "已恢复听写");
+      if (d.warning) alert(d.warning);
+      progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
+      playUrls(d.audio_urls, () => {
+        if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+      });
+    }
+
+    function renderHistory(items) {
+      historyList.innerHTML = "";
+      if (!items.length) {
+        const li = document.createElement("li");
+        li.textContent = "暂无历史记录。";
+        historyList.appendChild(li);
+        return;
+      }
+      items.forEach((it, idx) => {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "history-item-btn";
+        b.textContent = historyText(it);
+        b.addEventListener("click", async () => {
+          clearAutoTimer();
+          autoPaused = false;
+          try {
+            const d = await api("/api/resume/history", {
+              method: "POST",
+              body: { history_index: idx },
+            });
+            await resumeWithPayload(d);
+            await loadConfig();
+          } catch (e) {
+            setStatus(e.message);
+          }
+        });
+        li.appendChild(b);
+        historyList.appendChild(li);
+      });
+    }
+
+    function readSettings() {
+      return {
+        unit: $("unit").value,
+        lesson: $("lesson").value,
+        mode: document.querySelector('input[name="mode"]:checked').value,
+        dictation_mode: document.querySelector('input[name="dictation_mode"]:checked').value,
+        interval: parseInt($("interval").value, 10) || 10,
+      };
+    }
+
+    $("unit").addEventListener("change", async () => {
+      await api("/api/settings", { method: "POST", body: { unit: $("unit").value } });
+      const c = await api("/api/config");
+      const lessonSel = $("lesson");
+      lessonSel.innerHTML = "";
+      c.lessons.forEach((l) => {
+        const o = document.createElement("option");
+        o.value = l;
+        o.textContent = l;
+        if (l === c.lesson) o.selected = true;
+        lessonSel.appendChild(o);
+      });
+      progressEl.textContent = "进度：0/" + c.word_count;
+    });
+
+    $("lesson").addEventListener("change", async () => {
+      await api("/api/settings", {
+        method: "POST",
+        body: { unit: $("unit").value, lesson: $("lesson").value },
+      });
+      const c = await api("/api/config");
+      progressEl.textContent = "进度：0/" + c.word_count;
+    });
+
+    $("btnStart").addEventListener("click", async () => {
+      clearAutoTimer();
+      const s = readSettings();
+      sessionMode = s.mode;
+      autoPaused = false;
+      sessionActive = false;
+      $("btnPause").textContent = "暂停";
+      syncModeRadioSelection();
+      updateModeControlsState();
+      try {
+        const d = await api("/api/start", { method: "POST", body: s });
+        sessionActive = true;
+        setDictationModeDisabled(true);
+        updateModeControlsState();
+        setStatus(d.status);
+        progressEl.textContent = "进度：1/" + d.total;
+        playUrls(d.audio_urls, () => {
+          if (sessionMode === "auto") scheduleAutoNext();
+        });
+      } catch (e) {
+        setStatus(e.message);
+      }
+      await loadConfig();
+    });
+
+    $("btnNext").addEventListener("click", async () => {
+      clearAutoTimer();
+      if (!sessionActive) {
+        setStatus("已退出，点击「开始」继续。");
+        return;
+      }
+      try {
+        const d = await api("/api/next", { method: "POST" });
+        setStatus(d.status);
+        if (d.total != null && d.index != null)
+          progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
+        if (d.done) {
+          sessionActive = false;
+          setDictationModeDisabled(false);
+          updateModeControlsState();
+          await loadConfig();
+          return;
+        }
+        playUrls(d.audio_urls, () => {
+          if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+        });
+      } catch (e) {
+        setStatus(e.message);
+      }
+    });
+
+    $("btnReplay").addEventListener("click", async () => {
+      try {
+        const d = await api("/api/replay", { method: "POST" });
+        setStatus(d.status);
+        playUrls(d.audio_urls);
+      } catch (e) {
+        setStatus(e.message);
+      }
+    });
+
+    $("btnHint").addEventListener("click", async () => {
+      try {
+        const d = await api("/api/hint", { method: "POST" });
+        playUrls(d.audio_urls);
+      } catch (e) {
+        setStatus(e.message);
+      }
+    });
+
+    $("btnPause").addEventListener("click", async () => {
+      try {
+        const d = await api("/api/pause", { method: "POST" });
+        autoPaused = d.paused;
+        $("btnPause").textContent = d.paused ? "继续" : "暂停";
+        if (d.paused) {
+          clearAutoTimer();
+          player.pause();
+        } else if (sessionMode === "auto") {
+          // 继续时先重播当前题两遍，再恢复自动计时。
+          const rp = await api("/api/replay", { method: "POST" });
+          playUrls(rp.audio_urls, () => {
+            if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+          });
+        }
+        updateModeControlsState();
+      } catch (e) {
+        setStatus(e.message);
+      }
+    });
+
+    $("btnExit").addEventListener("click", async () => {
+      if (!sessionActive) {
+        setStatus("未在听写中。");
+        return;
+      }
+      clearAutoTimer();
+      autoPaused = true;
+      sessionActive = false;
+      player.pause();
+      setDictationModeDisabled(false);
+      updateModeControlsState();
+      try {
+        const d = await api("/api/exit", { method: "POST" });
+        setStatus(d.status || "已退出。");
+        if (d.total && d.index != null) {
+          progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
+        }
+        if (d.last_progress) $("lastProgress").textContent = d.last_progress;
+        await loadConfig();
+      } catch (e) {
+        setStatus(e.message);
+      }
+    });
+
+    $("btnResumeLast").addEventListener("click", async () => {
+      clearAutoTimer();
+      autoPaused = false;
+      $("btnPause").textContent = "暂停";
+      try {
+        const d = await api("/api/resume", { method: "POST" });
+        await resumeWithPayload(d);
+      } catch (e) {
+        setStatus(e.message);
+      }
+      await loadConfig();
+    });
+
+    function toggleHistoryPanel() {
+      const panel = $("historyPanel");
+      const show = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !show);
+      $("btnHistoryToggle").setAttribute("aria-expanded", show ? "true" : "false");
+    }
+    $("btnHistoryToggle").addEventListener("click", toggleHistoryPanel);
+    $("btnHistoryToggle").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleHistoryPanel();
+      }
+    });
+
+    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener("change", async () => {
+        const picked = document.querySelector('input[name="mode"]:checked').value;
+        if (!sessionActive) {
+          sessionMode = picked;
+          autoPaused = false;
+          updateModeControlsState();
+          return;
+        }
+
+        if (sessionMode === "auto" && !autoPaused && picked === "manual") {
+          setStatus("自动播报中，请先点「暂停」再切换手动。");
+          syncModeRadioSelection();
+          updateModeControlsState();
+          return;
+        }
+
+        try {
+          await api("/api/settings", { method: "POST", body: { mode: picked } });
+        } catch (e) {
+          setStatus(e.message);
+          syncModeRadioSelection();
+          updateModeControlsState();
+          return;
+        }
+
+        if (picked === "auto" && sessionMode !== "auto") {
+          sessionMode = "auto";
+          autoPaused = false;
+          $("btnPause").textContent = "暂停";
+          setStatus("已切换为自动模式。");
+          scheduleAutoNext();
+        } else if (picked === "manual") {
+          sessionMode = "manual";
+          autoPaused = false;
+          clearAutoTimer();
+          $("btnPause").textContent = "暂停";
+          setStatus("已切换为手动模式。");
+        }
+        syncModeRadioSelection();
+        updateModeControlsState();
+      });
+    });
+
+    $("btnGotoImport").addEventListener("click", () => {
+      $("word-import").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("addEn").focus();
+    });
+
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.getAttribute("data-tab");
+        document.querySelectorAll(".tab").forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-selected", b === btn ? "true" : "false");
+        });
+        ["single", "batch", "csv"].forEach((id) => {
+          $("tab-" + id).classList.toggle("hidden", id !== name);
+        });
+        setImportMsg("");
+      });
+    });
+
+    $("btnSaveSingle").addEventListener("click", async () => {
+      setImportMsg("");
+      try {
+        const d = await api("/api/words/single", {
+          method: "POST",
+          body: {
+            en: $("addEn").value,
+            pos: $("addPos").value,
+            zh: $("addZh").value,
+          },
+        });
+        if (d.message) {
+          setImportMsg(d.message, true);
+        } else {
+          setImportMsg("已保存 " + d.added + " 条，跳过重复 " + d.skipped + " 条。", true);
+          $("addEn").value = "";
+          $("addPos").value = "";
+          $("addZh").value = "";
+        }
+        await loadConfig();
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    $("btnSaveBatch").addEventListener("click", async () => {
+      setImportMsg("");
+      try {
+        const d = await api("/api/words/batch", {
+          method: "POST",
+          body: { text: $("batchText").value },
+        });
+        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
+        if (d.bad_lines) msg += " 无法解析行约 " + d.bad_lines + " 行。";
+        setImportMsg(msg, true);
+        if (d.added) $("batchText").value = "";
+        await loadConfig();
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    $("btnSaveCsv").addEventListener("click", async () => {
+      setImportMsg("");
+      const f = $("csvFile").files[0];
+      if (!f) {
+        setImportMsg("请先选择文件。", false);
+        return;
+      }
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/words/csv", { method: "POST", body: fd, credentials: "same-origin" });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || r.statusText);
+        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
+        if (d.err_lines) msg += " 问题行约 " + d.err_lines + " 行。";
+        setImportMsg(msg, true);
+        await loadConfig();
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.code !== "Space") return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT"))
+        return;
+      if (!sessionActive) {
+        e.preventDefault();
+        setStatus("已退出，点击「开始」继续。");
+        return;
+      }
+      e.preventDefault();
+      $("btnNext").click();
+    });
+
+    loadConfig().catch((e) => setStatus("加载失败：" + e.message));
+    setDictationModeDisabled(false);
+    updateModeControlsState();
+  </script>
+</body>
+</html>
