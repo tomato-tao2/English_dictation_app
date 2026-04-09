@@ -8,6 +8,63 @@
 </head>
 <body class="page-dictation">
   <div class="page-bg" aria-hidden="true"></div>
+  <div id="onboarding" class="onboarding hidden" aria-modal="true" role="dialog">
+    <section class="onboarding-step" data-step="1">
+      <p class="onboarding-kicker" id="welcomeDayLabel">第 1 天</p>
+      <h2 class="onboarding-title" id="welcomeTitle">欢迎你的到来</h2>
+      <p class="onboarding-text" id="welcomeText">先用一分钟体验一次听写，马上就能开始。</p>
+      <div class="onboarding-actions">
+        <button type="button" id="btnOnboardingNext1">进入背单词</button>
+        <a href="#word-import" id="linkOnboardingImport">先去录入单词</a>
+      </div>
+      <label class="onboarding-toggle">
+        <input type="checkbox" id="toggleWelcomeOff" />
+        不再显示欢迎页（可在浏览器本地设置恢复）
+      </label>
+    </section>
+
+    <section class="onboarding-step hidden" data-step="2">
+      <p class="onboarding-kicker">步骤 2 / 3</p>
+      <h2 class="onboarding-title">先选词库</h2>
+      <p class="onboarding-text">当前先用你的已有词库，后续会加入小学/初中/四级等预置词库。</p>
+      <div class="library-cards">
+        <button type="button" class="library-card active" data-library="current">
+          <strong>当前词库</strong>
+          <span>来自 words.json，可直接开始</span>
+        </button>
+        <button type="button" class="library-card" disabled>
+          <strong>预置词库（敬请期待）</strong>
+          <span>小学 / 初中 / 高中 / 四级 / 六级</span>
+        </button>
+      </div>
+      <div class="onboarding-actions">
+        <button type="button" class="btn-outline" id="btnOnboardingBack2">上一步</button>
+        <button type="button" id="btnOnboardingNext2">下一步</button>
+      </div>
+    </section>
+
+    <section class="onboarding-step hidden" data-step="3">
+      <p class="onboarding-kicker">步骤 3 / 3</p>
+      <h2 class="onboarding-title">快速设置并开始</h2>
+      <p class="onboarding-text">先体验核心功能：选模式、选听写方式，其他高级设置稍后再调。</p>
+      <div class="quick-form">
+        <div class="row">
+          <label>模式</label>
+          <label><input type="radio" name="quick_mode" value="manual" checked /> 手动</label>
+          <label><input type="radio" name="quick_mode" value="auto" /> 自动</label>
+        </div>
+        <div class="row">
+          <label>听写方式</label>
+          <label><input type="radio" name="quick_dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
+          <label><input type="radio" name="quick_dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+        </div>
+      </div>
+      <div class="onboarding-actions">
+        <button type="button" class="btn-outline" id="btnOnboardingBack3">上一步</button>
+        <button type="button" id="btnOnboardingStart">开始体验</button>
+      </div>
+    </section>
+  </div>
   <div class="wrap">
     <header class="top">
       <div class="brand">
@@ -64,6 +121,7 @@
 
     <section class="card panel-settings">
       <h2 class="card-title">听写设置</h2>
+      <p class="meta library-meta">词库：<span id="currentLibraryLabel">当前词库（words.json）</span></p>
       <div class="row">
         <label>模式</label>
         <label><input type="radio" name="mode" value="manual" checked /> 手动</label>
@@ -102,13 +160,13 @@
     <section class="card panel-actions">
       <h2 class="card-title">操作</h2>
       <div class="actions">
-        <button type="button" id="btnStart">开始</button>
-        <button type="button" id="btnNext">下一个</button>
-        <button type="button" id="btnReplay">重播题目</button>
-        <button type="button" id="btnHint">播报提示</button>
-        <button type="button" id="btnPause">暂停</button>
-        <button type="button" class="btn-outline" id="btnExit" title="退出听写并记忆当前单词">退出</button>
-        <button type="button" class="btn-outline" id="btnGotoImport" title="跳转到录入区域">录入单词</button>
+        <button type="button" id="btnStart" class="action-start">开始</button>
+        <button type="button" id="btnNext" class="action-secondary">下一个</button>
+        <button type="button" id="btnReplay" class="action-secondary">重播题目</button>
+        <button type="button" id="btnHint" class="action-secondary">播报提示</button>
+        <button type="button" id="btnPause" class="action-secondary">暂停</button>
+        <button type="button" class="btn-outline action-secondary" id="btnExit" title="退出听写并记忆当前单词">退出</button>
+        <button type="button" class="btn-outline action-secondary" id="btnGotoImport" title="跳转到录入区域">录入单词</button>
       </div>
       <p class="status" id="status">就绪</p>
     </section>
@@ -272,6 +330,7 @@
     async function loadConfig() {
       const c = await api("/api/config");
       $("lastProgress").textContent = c.last_progress || "";
+      $("currentLibraryLabel").textContent = c.current_library_label || "当前词库（words.json）";
       const unitSel = $("unit");
       const lessonSel = $("lesson");
       unitSel.innerHTML = "";
@@ -676,7 +735,106 @@
       $("btnNext").click();
     });
 
+    const ONBOARDING_DISABLED_KEY = "dictation.welcome.disabled";
+    const ONBOARDING_VISIT_DAYS_KEY = "dictation.welcome.visitDays";
+
+    function localGetJson(key, fallback) {
+      try {
+        const text = localStorage.getItem(key);
+        if (!text) return fallback;
+        return JSON.parse(text);
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    function localSetJson(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (_) {}
+    }
+
+    function todayKey() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function touchVisitDay() {
+      const days = localGetJson(ONBOARDING_VISIT_DAYS_KEY, []);
+      const today = todayKey();
+      if (!days.includes(today)) {
+        days.push(today);
+        localSetJson(ONBOARDING_VISIT_DAYS_KEY, days);
+      }
+      return days.length || 1;
+    }
+
+    function welcomeTextByDay(dayCount) {
+      if (dayCount <= 1) return { title: "欢迎你的到来", text: "先用一分钟体验一次听写，马上就能开始。" };
+      if (dayCount <= 3) return { title: `第 ${dayCount} 天见面了`, text: "你已经开始形成学习节奏，继续保持就会很快见效。" };
+      if (dayCount <= 7) return { title: `第 ${dayCount} 天，坚持很棒`, text: "每天一点点，词汇量会在不知不觉中增长。" };
+      return { title: `第 ${dayCount} 天，老朋友欢迎回来`, text: "你已经在稳步前进，今天继续来一轮听写吧。" };
+    }
+
+    function showOnboardingStep(step) {
+      document.querySelectorAll(".onboarding-step").forEach((el) => {
+        const s = parseInt(el.getAttribute("data-step"), 10);
+        el.classList.toggle("hidden", s !== step);
+      });
+    }
+
+    function closeOnboarding() {
+      $("onboarding").classList.add("hidden");
+      document.body.classList.remove("onboarding-open");
+    }
+
+    function openOnboarding(dayCount) {
+      const welcome = welcomeTextByDay(dayCount);
+      $("welcomeDayLabel").textContent = `第 ${dayCount} 天`;
+      $("welcomeTitle").textContent = welcome.title;
+      $("welcomeText").textContent = welcome.text;
+      $("toggleWelcomeOff").checked = localStorage.getItem(ONBOARDING_DISABLED_KEY) === "1";
+      showOnboardingStep(1);
+      $("onboarding").classList.remove("hidden");
+      document.body.classList.add("onboarding-open");
+    }
+
+    function initOnboarding() {
+      const dayCount = touchVisitDay();
+      const disabled = localStorage.getItem(ONBOARDING_DISABLED_KEY) === "1";
+      if (!disabled) openOnboarding(dayCount);
+
+      $("toggleWelcomeOff").addEventListener("change", (e) => {
+        localStorage.setItem(ONBOARDING_DISABLED_KEY, e.target.checked ? "1" : "0");
+      });
+      $("btnOnboardingNext1").addEventListener("click", () => showOnboardingStep(2));
+      $("btnOnboardingBack2").addEventListener("click", () => showOnboardingStep(1));
+      $("btnOnboardingNext2").addEventListener("click", () => showOnboardingStep(3));
+      $("btnOnboardingBack3").addEventListener("click", () => showOnboardingStep(2));
+      $("linkOnboardingImport").addEventListener("click", () => {
+        closeOnboarding();
+        setTimeout(() => {
+          $("word-import").scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 80);
+      });
+      $("btnOnboardingStart").addEventListener("click", async () => {
+        const quickMode = document.querySelector('input[name="quick_mode"]:checked').value;
+        const quickDm = document.querySelector('input[name="quick_dictation_mode"]:checked').value;
+        const modeEl = document.querySelector(`input[name="mode"][value="${quickMode}"]`);
+        const dmEl = document.querySelector(`input[name="dictation_mode"][value="${quickDm}"]`);
+        if (modeEl) modeEl.checked = true;
+        if (dmEl) dmEl.checked = true;
+        closeOnboarding();
+        await api("/api/settings", { method: "POST", body: { mode: quickMode, dictation_mode: quickDm } }).catch(() => {});
+        $("btnStart").click();
+      });
+    }
+
     loadConfig().catch((e) => setStatus("加载失败：" + e.message));
+    initOnboarding();
     setDictationModeDisabled(false);
     updateModeControlsState();
   </script>

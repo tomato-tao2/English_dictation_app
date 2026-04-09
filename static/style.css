@@ -33,6 +33,135 @@ body {
   position: relative;
 }
 
+body.onboarding-open {
+  overflow: hidden;
+}
+
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: linear-gradient(145deg, #fffcf7 0%, #f3f0ea 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.onboarding.hidden {
+  display: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.onboarding-step {
+  width: min(760px, 100%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 24px 22px;
+}
+
+.onboarding-kicker {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 0.84rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.onboarding-title {
+  margin: 0 0 10px;
+  font-family: var(--font-title);
+  font-size: 1.58rem;
+}
+
+.onboarding-text {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+}
+
+.onboarding-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.onboarding-actions button,
+.onboarding-actions a {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+}
+
+.onboarding-actions .btn-outline,
+.onboarding-actions a {
+  background: #fff;
+  color: var(--accent);
+  border: 1px solid #9cbfb5;
+}
+
+.onboarding-toggle {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.library-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.library-card {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.library-card strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.library-card span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.library-card.active {
+  border-color: #9cbfb5;
+  background: var(--accent-soft);
+}
+
+.library-card:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.quick-form {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 12px 14px 2px;
+}
+
 .page-bg {
   pointer-events: none;
   position: fixed;
@@ -423,6 +552,11 @@ textarea:focus {
   font-size: 0.95rem;
 }
 
+.library-meta {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
 .muted {
   color: var(--text-muted);
   font-size: 0.88rem;
@@ -520,6 +654,18 @@ textarea:focus {
 .actions button.btn-outline:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.actions button.action-start {
+  font-size: 1.02rem;
+  font-weight: 700;
+  min-width: 120px;
+  padding: 10px 18px;
+  box-shadow: 0 4px 12px rgba(27, 107, 92, 0.2);
+}
+
+.actions button.action-secondary {
+  opacity: 0.95;
 }
 
 .history-panel {

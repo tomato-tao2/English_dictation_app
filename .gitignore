@@ -1,3 +1,6 @@
+.flask_secret_key
+web_access_password.txt
+
 .venv/
 __pycache__/
 *.py[cod]

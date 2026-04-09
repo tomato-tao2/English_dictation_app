@@ -22,14 +22,52 @@ from flask import (
 import dictation_core as dc
 from word_import import parse_batch_text, parse_csv_text
 
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _app_secret_key() -> str:
+    """稳定会话密钥：优先环境变量，否则读写项目目录下 .flask_secret_key（避免每次重启导致 Cookie 全部失效）。"""
+    env = (os.environ.get("FLASK_SECRET_KEY") or "").strip()
+    if env:
+        return env
+    key_path = os.path.join(_BASE_DIR, ".flask_secret_key")
+    try:
+        with open(key_path, encoding="utf-8") as f:
+            k = f.read().strip()
+            if k:
+                return k
+    except OSError:
+        pass
+    k = secrets.token_hex(32)
+    try:
+        with open(key_path, "w", encoding="utf-8") as f:
+            f.write(k)
+    except OSError:
+        pass
+    return k
+
+
+def _web_password() -> str:
+    """访问密码：环境变量 DICTATION_WEB_PASSWORD；未设置时可放 web_access_password.txt（单行）。"""
+    p = os.environ.get("DICTATION_WEB_PASSWORD", "").strip()
+    if p:
+        return p
+    path = os.path.join(_BASE_DIR, "web_access_password.txt")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.secret_key = _app_secret_key()
 # 改模板后无需重启即可生效（debug=False 时默认会长期缓存模板）
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 
 def _login_required():
-    pwd = os.environ.get("DICTATION_WEB_PASSWORD", "").strip()
+    pwd = _web_password()
     if not pwd:
         return True
     return session.get("dictation_ok") is True
@@ -60,16 +98,18 @@ def _session_defaults():
 
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
-    pwd_env = os.environ.get("DICTATION_WEB_PASSWORD", "").strip()
+    pwd_env = _web_password()
     if not pwd_env:
         session["dictation_ok"] = True
         return redirect(url_for("index"))
 
     if request.method == "POST":
-        if request.form.get("password", "") == pwd_env:
+        form_pwd = (request.form.get("password") or "").strip()
+        if form_pwd == pwd_env:
             session["dictation_ok"] = True
+            session.permanent = True
             return redirect(url_for("index"))
-        return render_template("login.html", error="密码错误"), 401
+        return render_template("login.html", error="密码错误")
 
     return render_template("login.html", error=None)
 
@@ -83,7 +123,7 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    show_logout = bool(os.environ.get("DICTATION_WEB_PASSWORD", "").strip())
+    show_logout = bool(_web_password())
     return render_template("index.html", show_logout=show_logout)
 
 
@@ -99,6 +139,7 @@ def api_config():
         {
             "units": units,
             "lessons": lessons,
+            "current_library_label": "当前词库（words.json）",
             "unit": unit,
             "lesson": lesson,
             "mode": session.get("mode", "manual"),
