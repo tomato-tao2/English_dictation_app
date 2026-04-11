@@ -24,6 +24,8 @@ from word_import import parse_batch_text, parse_csv_text
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+_DICTATION_MODES = ("en_to_zh", "zh_to_en", "en_spell")
+
 
 def _app_secret_key() -> str:
     """稳定会话密钥：优先环境变量，否则读写项目目录下 .flask_secret_key（避免每次重启导致 Cookie 全部失效）。"""
@@ -127,6 +129,13 @@ def index():
     return render_template("index.html", show_logout=show_logout)
 
 
+@app.route("/import")
+@login_required
+def import_page():
+    show_logout = bool(_web_password())
+    return render_template("import.html", show_logout=show_logout)
+
+
 @app.get("/api/config")
 @login_required
 def api_config():
@@ -164,7 +173,7 @@ def api_settings():
         session["lesson"] = str(data["lesson"])
     if "mode" in data and data["mode"] in ("manual", "auto"):
         session["mode"] = data["mode"]
-    if "dictation_mode" in data and data["dictation_mode"] in ("en_to_zh", "zh_to_en"):
+    if "dictation_mode" in data and data["dictation_mode"] in _DICTATION_MODES:
         session["dictation_mode"] = data["dictation_mode"]
     if "interval" in data:
         try:
@@ -221,6 +230,10 @@ def _current_filtered():
     return dc.scope_filtered_words(words, unit, lesson)
 
 
+def _reset_spell_hint_clicks() -> None:
+    session["spell_hint_clicks"] = 0
+
+
 def _prompt_urls(word: dict) -> list[str]:
     dm = session.get("dictation_mode", "en_to_zh")
     text, lang = dc.prompt_text_and_language(word, dm)
@@ -262,6 +275,7 @@ def _resume_payload_from_record(record: dict) -> tuple[dict | None, str | None]:
     session["index"] = resolved
     session["session_active"] = True
     session["auto_paused"] = False
+    _reset_spell_hint_clicks()
     word = filtered[resolved]
     urls = _prompt_urls(word)
     payload = {
@@ -288,7 +302,7 @@ def api_start():
         session["lesson"] = str(data["lesson"])
     if "mode" in data and data["mode"] in ("manual", "auto"):
         session["mode"] = data["mode"]
-    if "dictation_mode" in data and data["dictation_mode"] in ("en_to_zh", "zh_to_en"):
+    if "dictation_mode" in data and data["dictation_mode"] in _DICTATION_MODES:
         session["dictation_mode"] = data["dictation_mode"]
     if "interval" in data:
         try:
@@ -306,6 +320,7 @@ def api_start():
     session["index"] = 0
     session["session_active"] = True
     session["auto_paused"] = False
+    _reset_spell_hint_clicks()
     word = filtered[0]
     urls = _prompt_urls(word)
     total = len(filtered)
@@ -347,6 +362,7 @@ def api_next():
         )
 
     session["index"] = idx + 1
+    _reset_spell_hint_clicks()
     word = filtered[session["index"]]
     urls = _prompt_urls(word)
     return jsonify(
@@ -384,6 +400,17 @@ def api_hint():
         return jsonify({"error": "请先开始听写"}), 400
     word = filtered[idx]
     dm = session.get("dictation_mode", "en_to_zh")
+    if dm == "en_spell":
+        session["spell_hint_clicks"] = int(session.get("spell_hint_clicks", 0)) + 1
+        c = session["spell_hint_clicks"]
+        hint_text, hint_kind = dc.spell_hint_segment(word, c)
+        return jsonify(
+            {
+                "audio_urls": [],
+                "hint_text": hint_text,
+                "hint_kind": hint_kind,
+            }
+        )
     text, lang = dc.hint_text_and_language(word, dm)
     if not text:
         return jsonify({"error": "无提示内容"}), 400

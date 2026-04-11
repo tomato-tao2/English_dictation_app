@@ -5,6 +5,10 @@
 }
 
 :root {
+  /* 全站页面底（与 .page-bg / 欢迎层共用，避免欢迎页与内页观感不一致） */
+  --page-surface-bg:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(27, 107, 92, 0.06), transparent 55%),
+    var(--bg-page);
   --bg-page: #f3f0ea;
   --bg-card: #fffcf7;
   --border: #e5dfd4;
@@ -41,7 +45,7 @@ body.onboarding-open {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: linear-gradient(145deg, #fffcf7 0%, #f3f0ea 100%);
+  background: var(--page-surface-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,11 +62,91 @@ body.onboarding-open {
 
 .onboarding-step {
   width: min(760px, 100%);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid #e0d8ca;
   border-radius: 16px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 28px rgba(44, 42, 38, 0.1);
   padding: 24px 22px;
+  backdrop-filter: blur(2px);
+}
+
+.onboarding-step--splash {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.welcome-app-name {
+  margin: 0 0 16px;
+  max-width: min(34em, 92vw);
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  opacity: 0.92;
+}
+
+.welcome-splash {
+  margin: 0 0 28px;
+  max-width: min(34em, 92vw);
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: clamp(1.75rem, 4.2vw, 2.65rem);
+  font-weight: 600;
+  line-height: 1.38;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.welcome-splash-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.welcome-enter-btn {
+  padding: 12px 28px;
+  font: inherit;
+  font-size: clamp(1rem, 2.1vw, 1.2rem);
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(27, 107, 92, 0.22);
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.welcome-splash-actions.welcome-btn-animate .welcome-enter-btn {
+  animation: welcomeBtnFade 0.7s ease 0.32s forwards;
+}
+
+@keyframes welcomeBtnFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-enter-btn:hover {
+  background: var(--accent-hover);
 }
 
 .onboarding-kicker {
@@ -111,15 +195,6 @@ body.onboarding-open {
   border: 1px solid #9cbfb5;
 }
 
-.onboarding-toggle {
-  margin-top: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.86rem;
-}
-
 .library-cards {
   display: grid;
   gap: 10px;
@@ -166,9 +241,7 @@ body.onboarding-open {
   pointer-events: none;
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(27, 107, 92, 0.06), transparent 55%),
-    var(--bg-page);
+  background: var(--page-surface-bg);
   z-index: 0;
 }
 
@@ -460,10 +533,6 @@ h1 {
   min-width: 12em;
 }
 
-#word-import {
-  scroll-margin-top: 16px;
-}
-
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -557,6 +626,24 @@ textarea:focus {
   margin-bottom: 10px;
 }
 
+.library-switch-btn {
+  margin-left: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #9cbfb5;
+  background: #fff;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.library-switch-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
 .muted {
   color: var(--text-muted);
   font-size: 0.88rem;
@@ -567,6 +654,82 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+.action-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.action-group-title {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.spell-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: rgba(255, 252, 247, 0.85);
+}
+
+.spell-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.spell-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.spell-input {
+  flex: 1 1 200px;
+  min-width: 180px;
+  max-width: 100%;
+}
+
+.spell-hint-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(27, 107, 92, 0.22);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.spell-hint-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.spell-hint-text {
+  display: block;
+  color: var(--text);
+  word-break: break-word;
+}
+
+@media (max-width: 760px) {
+  .action-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 .actions-inline {
@@ -666,6 +829,15 @@ textarea:focus {
 
 .actions button.action-secondary {
   opacity: 0.95;
+}
+
+.top-links {
+  display: inline-flex;
+  gap: 12px;
+}
+
+.import-page-only {
+  min-height: calc(100vh - 190px);
 }
 
 .history-panel {

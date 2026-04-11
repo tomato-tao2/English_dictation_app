@@ -121,12 +121,51 @@ def chinese_speech_text(word: dict) -> str:
 def prompt_text_and_language(word: dict, dictation_mode: str) -> tuple[str, str]:
     if dictation_mode == "zh_to_en":
         return chinese_speech_text(word), "zh"
+    # en_to_zh、en_spell：均播报英文单词
     return str(word.get("en", "")).strip(), "en"
+
+
+def word_mnemonic(word: dict) -> str:
+    """巧记文案；兼容字段 mnemonic / 巧记 / qiaoji。"""
+    for k in ("mnemonic", "巧记", "qiaoji"):
+        v = word.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            return s
+    return ""
+
+
+def spell_answer_line(word: dict) -> str:
+    """拼写模式「原文」一行：英文 + 中文义项（若有）。"""
+    en = str(word.get("en", "")).strip()
+    zh = str(word.get("zh", "")).strip()
+    if en and zh:
+        return f"{en} ｜ {zh}"
+    return en or zh
+
+
+def spell_hint_segment(word: dict, click_index: int) -> tuple[str, str]:
+    """
+    电脑拼写模式提示：第 click_index 次点击（从 1 起）在巧记与原文之间交替。
+    返回 (展示文案, kind)，kind 为 "mnemonic" | "answer" | "mnemonic_empty"。
+    """
+    m = word_mnemonic(word)
+    ans = spell_answer_line(word)
+    if click_index % 2 == 1:
+        if m:
+            return m, "mnemonic"
+        return "暂无巧记", "mnemonic_empty"
+    return ans, "answer"
 
 
 def hint_text_and_language(word: dict, dictation_mode: str) -> tuple[str, str]:
     if dictation_mode == "zh_to_en":
         return str(word.get("en", "")).strip(), "en"
+    if dictation_mode == "en_spell":
+        # 网页端拼写模式用 spell_hint_segment，此处勿用于 TTS
+        return "", "en"
     return chinese_speech_text(word), "zh"
 
 

@@ -7,3 +7,10 @@ __pycache__/
 .tts_cache/
 tts_cache/
 *.mp3
+
+# 本机从 ECDICT 下载的词典原表（体积大，勿提交）
+ecdict.csv
+ecdict.mini.csv
+
+# 从 GitHub ZIP 解压的 ECDICT 目录（体积大，勿提交）
+ECDICT-master/

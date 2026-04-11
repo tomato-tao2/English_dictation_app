@@ -128,6 +128,88 @@ def parse_batch_text(text: str) -> tuple[list[dict[str, str]], list[str]]:
     return ok, errors
 
 
+def _ecdict_normalize_zh(s: str) -> str:
+    s = (s or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"\r\n|\r|\n", ";", s)
+    s = re.sub(r";{2,}", ";", s)
+    return s.strip("; \t")
+
+
+def _ecdict_first_pos(pos: str) -> str:
+    """ECDICT pos 形如 n:46/v:54 或 n. 名词…，取首个简明词性。"""
+    pos = (pos or "").strip()
+    if not pos:
+        return ""
+    chunk = pos.split("/")[0].strip()
+    m = re.match(r"^([a-z]+)(?:\s*[.:：]|$)", chunk, re.I)
+    if m:
+        return m.group(1).lower()[:6]
+    return ""
+
+
+def _ecdict_field_lookup(fieldnames: list[str] | None) -> dict[str, str]:
+    """列名大小写不敏感 → 原始表头字符串。"""
+    if not fieldnames:
+        return {}
+    return {str(n).strip().lower(): str(n).strip() for n in fieldnames if str(n).strip()}
+
+
+def _ecdict_cell(row: dict[str, str], lookup: dict[str, str], key: str) -> str:
+    col = lookup.get(key.lower())
+    if not col:
+        return ""
+    return str(row.get(col, "") or "").strip()
+
+
+def parse_ecdict_csv_text(
+    csv_text: str,
+    *,
+    max_rows: int | None = 8000,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """
+    解析 [ECDICT](https://github.com/skywind3000/ECDICT) 风格 CSV（表头含 word、translation）。
+    中文义项里的换行合并为分号；词性取 pos 字段首段简写。
+    max_rows：网页一次导入上限；命令行工具可传 None 不限制。
+    """
+    ok: list[dict[str, str]] = []
+    errors: list[str] = []
+    f = io.StringIO(csv_text.strip())
+    try:
+        reader = csv.DictReader(f)
+    except Exception as e:
+        return [], [str(e)]
+
+    lookup = _ecdict_field_lookup(reader.fieldnames)
+    if "word" not in lookup or "translation" not in lookup:
+        return [], ["不是 ECDICT 格式：表头需包含 word 与 translation 列。"]
+
+    for row in reader:
+        if max_rows is not None and len(ok) >= max_rows:
+            break
+        en = _ecdict_cell(row, lookup, "word")
+        zh = _ecdict_normalize_zh(_ecdict_cell(row, lookup, "translation"))
+        if not en or not zh:
+            continue
+        if not re.search(r"[\u4e00-\u9fff]", zh):
+            errors.append(en[:40])
+            continue
+        pos_raw = _ecdict_cell(row, lookup, "pos")
+        pos = _ecdict_first_pos(pos_raw)
+        item: dict[str, str] = {"en": en, "zh": zh}
+        if pos:
+            item["pos"] = pos
+        ok.append(item)
+
+    return ok, errors
+
+
+def _csv_first_line_looks_ecdict(first_line: str) -> bool:
+    s = first_line.strip().lower()
+    return s.startswith("word,") and ",translation," in s
+
+
 def _parse_section_header(line: str) -> tuple[str, str]:
     s = line.strip().lower().replace("，", ",")
     s = re.sub(r"\s+", " ", s)
@@ -169,10 +251,17 @@ def _header_map(header: list[str]) -> dict[str, int]:
 
 
 def parse_csv_text(csv_text: str) -> tuple[list[dict[str, str]], list[str]]:
-    """Parse CSV string (UTF-8). Supports 2 cols (en,zh) or 3 (en,pos,zh)."""
+    """Parse CSV string (UTF-8). Supports 2 cols (en,zh) or 3 (en,pos,zh)；ECDICT 全表见 parse_ecdict_csv_text。"""
+    raw = csv_text.strip().lstrip("\ufeff")
+    if not raw:
+        return [], []
+    first = raw.splitlines()[0]
+    if _csv_first_line_looks_ecdict(first):
+        return parse_ecdict_csv_text(csv_text, max_rows=8000)
+
     ok: list[dict[str, str]] = []
     errors: list[str] = []
-    f = io.StringIO(csv_text.strip())
+    f = io.StringIO(raw)
     try:
         reader = csv.reader(f)
         rows = list(reader)

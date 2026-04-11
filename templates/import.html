@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>录入单词</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-dictation">
+  <div class="page-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>录入单词</h1>
+      </div>
+      <div class="top-links">
+        <a class="link-out" href="{{ url_for('index') }}">返回听写</a>
+        {% if show_logout %}
+        <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <section class="card panel-import import-page-only">
+      <h2 class="card-title">录入单词</h2>
+      <p class="import-hint">新词会写入 <code>words.json</code>（与程序同目录）。保存后听写页的计数会自动刷新。</p>
+      <p class="import-hint" id="importScopeHint">默认归入当前听写范围。</p>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="single" role="tab" aria-selected="true">单个添加</button>
+        <button type="button" class="tab" data-tab="batch" role="tab" aria-selected="false">批量粘贴</button>
+        <button type="button" class="tab" data-tab="csv" role="tab" aria-selected="false">CSV 文件</button>
+      </div>
+      <div id="tab-single" class="tab-panel" role="tabpanel">
+        <div class="field-row">
+          <label for="addEn">英文</label>
+          <input type="text" id="addEn" autocomplete="off" placeholder="例如 abandon" />
+        </div>
+        <div class="field-row">
+          <label for="addPos">词性（可选）</label>
+          <input type="text" id="addPos" autocomplete="off" placeholder="例如 v." />
+        </div>
+        <div class="field-row">
+          <label for="addZh">中文释义</label>
+          <input type="text" id="addZh" autocomplete="off" placeholder="例如 放弃；抛弃" />
+        </div>
+        <p class="import-hint">同一单词不同词性会分别保存；重复「英文 + 词性 + 单元 + 部分」则跳过。</p>
+        <button type="button" class="btn-secondary" id="btnSaveSingle">保存到词库</button>
+      </div>
+      <div id="tab-batch" class="tab-panel hidden" role="tabpanel">
+        <p class="import-hint">每行一条。推荐：<code>英文,词性,中文;义项2</code>（例：<code>convert,v,转变;转换</code>）。也支持在批量里写 <code>unit1lesson1</code>、<code>lesson2</code> 等段落头切换单元/部分。</p>
+        <textarea id="batchText" placeholder="abandon,v,放弃;抛弃"></textarea>
+        <p class="import-hint" style="margin-top:8px">也支持「英文,词性.中文」或仅「英文,中文」。</p>
+        <button type="button" class="btn-secondary" id="btnSaveBatch">解析并加入词库</button>
+      </div>
+      <div id="tab-csv" class="tab-panel hidden" role="tabpanel">
+        <p class="import-hint">从豆包等导出的 CSV：表头建议含英文、中文；若有词性可加一列。也支持无表头两列或三列。</p>
+        <p class="import-hint">
+          也支持 <strong>ECDICT</strong> 官方 CSV（表头含 <code>word</code>、<code>translation</code> 等），数据与说明见
+          <a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noopener noreferrer">skywind3000/ECDICT</a>（MIT）。
+          网页一次最多写入约 8000 条；整库请用项目里的命令行：
+          <code>python tools/import_ecdict_preset.py ecdict.csv --limit 3000 --max-rank 20000</code>
+        </p>
+        <input type="file" id="csvFile" accept=".csv,.txt" />
+        <p class="import-hint" style="margin-top:10px">请使用 UTF-8 编码。</p>
+        <button type="button" class="btn-secondary" id="btnSaveCsv">上传并导入</button>
+      </div>
+      <p class="import-msg" id="importMsg" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const importMsg = $("importMsg");
+
+    function setImportMsg(text, ok) {
+      importMsg.textContent = text || "";
+      importMsg.className = "import-msg" + (text ? (ok ? " ok" : " err") : "");
+    }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, {
+        method: opts.method || "GET",
+        headers: { "Content-Type": "application/json", ...opts.headers },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        credentials: "same-origin",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || r.statusText);
+      return data;
+    }
+
+    async function loadScopeHint() {
+      try {
+        const c = await api("/api/config");
+        $("importScopeHint").textContent = `当前归入范围：${c.unit || "全部单元"} / ${c.lesson || "全部部分"}`;
+      } catch (_) {}
+    }
+
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.getAttribute("data-tab");
+        document.querySelectorAll(".tab").forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-selected", b === btn ? "true" : "false");
+        });
+        ["single", "batch", "csv"].forEach((id) => {
+          $("tab-" + id).classList.toggle("hidden", id !== name);
+        });
+        setImportMsg("");
+      });
+    });
+
+    $("btnSaveSingle").addEventListener("click", async () => {
+      setImportMsg("");
+      try {
+        const d = await api("/api/words/single", {
+          method: "POST",
+          body: {
+            en: $("addEn").value,
+            pos: $("addPos").value,
+            zh: $("addZh").value,
+          },
+        });
+        if (d.message) {
+          setImportMsg(d.message, true);
+        } else {
+          setImportMsg("已保存 " + d.added + " 条，跳过重复 " + d.skipped + " 条。", true);
+          $("addEn").value = "";
+          $("addPos").value = "";
+          $("addZh").value = "";
+        }
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    $("btnSaveBatch").addEventListener("click", async () => {
+      setImportMsg("");
+      try {
+        const d = await api("/api/words/batch", {
+          method: "POST",
+          body: { text: $("batchText").value },
+        });
+        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
+        if (d.bad_lines) msg += " 无法解析行约 " + d.bad_lines + " 行。";
+        setImportMsg(msg, true);
+        if (d.added) $("batchText").value = "";
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    $("btnSaveCsv").addEventListener("click", async () => {
+      setImportMsg("");
+      const f = $("csvFile").files[0];
+      if (!f) {
+        setImportMsg("请先选择文件。", false);
+        return;
+      }
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await fetch("/api/words/csv", { method: "POST", body: fd, credentials: "same-origin" });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || r.statusText);
+        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
+        if (d.err_lines) msg += " 问题行约 " + d.err_lines + " 行。";
+        setImportMsg(msg, true);
+      } catch (e) {
+        setImportMsg(e.message, false);
+      }
+    });
+
+    loadScopeHint();
+  </script>
+</body>
+</html>

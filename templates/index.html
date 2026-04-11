@@ -9,22 +9,16 @@
 <body class="page-dictation">
   <div class="page-bg" aria-hidden="true"></div>
   <div id="onboarding" class="onboarding hidden" aria-modal="true" role="dialog">
-    <section class="onboarding-step" data-step="1">
-      <p class="onboarding-kicker" id="welcomeDayLabel">第 1 天</p>
-      <h2 class="onboarding-title" id="welcomeTitle">欢迎你的到来</h2>
-      <p class="onboarding-text" id="welcomeText">先用一分钟体验一次听写，马上就能开始。</p>
-      <div class="onboarding-actions">
-        <button type="button" id="btnOnboardingNext1">进入背单词</button>
-        <a href="#word-import" id="linkOnboardingImport">先去录入单词</a>
+    <section class="onboarding-step onboarding-step--splash hidden" data-step="welcome">
+      <p class="welcome-app-name">英语单词听写</p>
+      <p class="welcome-splash" id="welcomeSplashText">欢迎你的到来。先用一分钟体验一次听写，马上就能开始。</p>
+      <div class="welcome-splash-actions" id="welcomeSplashActions">
+        <button type="button" id="btnWelcomeEnter" class="welcome-enter-btn">进入背单词</button>
       </div>
-      <label class="onboarding-toggle">
-        <input type="checkbox" id="toggleWelcomeOff" />
-        不再显示欢迎页（可在浏览器本地设置恢复）
-      </label>
     </section>
 
-    <section class="onboarding-step hidden" data-step="2">
-      <p class="onboarding-kicker">步骤 2 / 3</p>
+    <section class="onboarding-step hidden" data-step="library">
+      <p class="onboarding-kicker">首次设置 1 / 2</p>
       <h2 class="onboarding-title">先选词库</h2>
       <p class="onboarding-text">当前先用你的已有词库，后续会加入小学/初中/四级等预置词库。</p>
       <div class="library-cards">
@@ -38,30 +32,26 @@
         </button>
       </div>
       <div class="onboarding-actions">
-        <button type="button" class="btn-outline" id="btnOnboardingBack2">上一步</button>
-        <button type="button" id="btnOnboardingNext2">下一步</button>
+        <button type="button" class="btn-outline" id="btnSetupBackLibrary">上一步</button>
+        <button type="button" id="btnSetupNextLibrary">下一步</button>
       </div>
     </section>
 
-    <section class="onboarding-step hidden" data-step="3">
-      <p class="onboarding-kicker">步骤 3 / 3</p>
-      <h2 class="onboarding-title">快速设置并开始</h2>
-      <p class="onboarding-text">先体验核心功能：选模式、选听写方式，其他高级设置稍后再调。</p>
+    <section class="onboarding-step hidden" data-step="dictation">
+      <p class="onboarding-kicker">首次设置 2 / 2</p>
+      <h2 class="onboarding-title">设置听写方式</h2>
+      <p class="onboarding-text">这一步只在首次出现，之后会自动记住你的偏好。</p>
       <div class="quick-form">
         <div class="row">
-          <label>模式</label>
-          <label><input type="radio" name="quick_mode" value="manual" checked /> 手动</label>
-          <label><input type="radio" name="quick_mode" value="auto" /> 自动</label>
-        </div>
-        <div class="row">
           <label>听写方式</label>
-          <label><input type="radio" name="quick_dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
-          <label><input type="radio" name="quick_dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+          <label><input type="radio" name="first_dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
+          <label><input type="radio" name="first_dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+          <label><input type="radio" name="first_dictation_mode" value="en_spell" /> 听英文 · 电脑拼写</label>
         </div>
       </div>
       <div class="onboarding-actions">
-        <button type="button" class="btn-outline" id="btnOnboardingBack3">上一步</button>
-        <button type="button" id="btnOnboardingStart">开始体验</button>
+        <button type="button" class="btn-outline" id="btnSetupBackDictation">上一步</button>
+        <button type="button" id="btnSetupFinish">完成并进入</button>
       </div>
     </section>
   </div>
@@ -108,7 +98,7 @@
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">错题回顾</button>
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">学习统计</button>
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">词表导出</button>
-            <a class="hero-chip hero-chip--link" href="#word-import">去录入单词</a>
+            <a class="hero-chip hero-chip--link" href="/import">去录入单词</a>
           </div>
         </div>
       </div>
@@ -121,7 +111,10 @@
 
     <section class="card panel-settings">
       <h2 class="card-title">听写设置</h2>
-      <p class="meta library-meta">词库：<span id="currentLibraryLabel">当前词库（words.json）</span></p>
+      <p class="meta library-meta">
+        词库：<span id="currentLibraryLabel">当前词库（words.json）</span>
+        <button type="button" class="library-switch-btn" id="btnSwitchLibrary" title="预置词库功能即将上线">切换词库</button>
+      </p>
       <div class="row">
         <label>模式</label>
         <label><input type="radio" name="mode" value="manual" checked /> 手动</label>
@@ -131,6 +124,7 @@
         <label>听写方式</label>
         <label><input type="radio" name="dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
         <label><input type="radio" name="dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+        <label><input type="radio" name="dictation_mode" value="en_spell" /> 听英文 · 电脑拼写</label>
       </div>
       <div class="row grid-3">
         <div>
@@ -159,55 +153,50 @@
 
     <section class="card panel-actions">
       <h2 class="card-title">操作</h2>
-      <div class="actions">
-        <button type="button" id="btnStart" class="action-start">开始</button>
-        <button type="button" id="btnNext" class="action-secondary">下一个</button>
-        <button type="button" id="btnReplay" class="action-secondary">重播题目</button>
-        <button type="button" id="btnHint" class="action-secondary">播报提示</button>
-        <button type="button" id="btnPause" class="action-secondary">暂停</button>
-        <button type="button" class="btn-outline action-secondary" id="btnExit" title="退出听写并记忆当前单词">退出</button>
-        <button type="button" class="btn-outline action-secondary" id="btnGotoImport" title="跳转到录入区域">录入单词</button>
+      <div class="action-groups">
+        <div class="action-group">
+          <p class="action-group-title">听写控制</p>
+          <div class="actions">
+            <button type="button" id="btnStart" class="action-start">开始</button>
+            <button type="button" id="btnPause" class="action-secondary">暂停</button>
+            <button type="button" class="btn-outline action-secondary" id="btnExit" title="退出听写并记忆当前单词">退出</button>
+          </div>
+        </div>
+        <div class="action-group">
+          <p class="action-group-title">听写辅助</p>
+          <div class="actions">
+            <button type="button" id="btnNext" class="action-secondary">下一个</button>
+            <button type="button" id="btnReplay" class="action-secondary">重播题目</button>
+            <button type="button" id="btnHint" class="action-secondary">播报提示</button>
+          </div>
+        </div>
+        <div class="action-group">
+          <p class="action-group-title">管理入口</p>
+          <div class="actions">
+            <button type="button" class="btn-outline action-secondary" id="btnGotoImport" title="跳转到录入页面">录入单词</button>
+          </div>
+        </div>
+      </div>
+      <div id="spellPanel" class="spell-panel hidden" aria-hidden="true">
+        <div class="spell-row">
+          <label for="spellInput" class="spell-label">键入拼写</label>
+          <input
+            type="text"
+            id="spellInput"
+            class="spell-input"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="在此输入英文"
+          />
+        </div>
+        <div id="spellHintBox" class="spell-hint-box hidden" aria-live="polite">
+          <span class="spell-hint-label" id="spellHintLabel"></span>
+          <span class="spell-hint-text" id="spellHintText"></span>
+        </div>
       </div>
       <p class="status" id="status">就绪</p>
-    </section>
-
-    <section class="card panel-import" id="word-import">
-      <h2 class="card-title">录入单词</h2>
-      <p class="import-hint">新词会写入 <code>words.json</code>（与程序同目录）。保存后上方「进度」计数会自动刷新。</p>
-      <div class="tabs" role="tablist">
-        <button type="button" class="tab active" data-tab="single" role="tab" aria-selected="true">单个添加</button>
-        <button type="button" class="tab" data-tab="batch" role="tab" aria-selected="false">批量粘贴</button>
-        <button type="button" class="tab" data-tab="csv" role="tab" aria-selected="false">CSV 文件</button>
-      </div>
-      <div id="tab-single" class="tab-panel" role="tabpanel">
-        <div class="field-row">
-          <label for="addEn">英文</label>
-          <input type="text" id="addEn" autocomplete="off" placeholder="例如 abandon" />
-        </div>
-        <div class="field-row">
-          <label for="addPos">词性（可选）</label>
-          <input type="text" id="addPos" autocomplete="off" placeholder="例如 v." />
-        </div>
-        <div class="field-row">
-          <label for="addZh">中文释义</label>
-          <input type="text" id="addZh" autocomplete="off" placeholder="例如 放弃；抛弃" />
-        </div>
-        <p class="import-hint">同一单词不同词性会分别保存；重复「英文 + 词性 + 单元 + 部分」则跳过。</p>
-        <button type="button" class="btn-secondary" id="btnSaveSingle">保存到词库</button>
-      </div>
-      <div id="tab-batch" class="tab-panel hidden" role="tabpanel">
-        <p class="import-hint">每行一条。推荐：<code>英文,词性,中文;义项2</code>（例：<code>convert,v,转变;转换</code>）。也支持在批量里写 <code>unit1lesson1</code>、<code>lesson2</code> 等段落头切换单元/部分。</p>
-        <textarea id="batchText" placeholder="abandon,v,放弃;抛弃"></textarea>
-        <p class="import-hint" style="margin-top:8px">也支持「英文,词性.中文」或仅「英文,中文」。</p>
-        <button type="button" class="btn-secondary" id="btnSaveBatch">解析并加入词库</button>
-      </div>
-      <div id="tab-csv" class="tab-panel hidden" role="tabpanel">
-        <p class="import-hint">从豆包等导出的 CSV：表头建议含英文、中文；若有词性可加一列。也支持无表头两列或三列。</p>
-        <input type="file" id="csvFile" accept=".csv,.txt" />
-        <p class="import-hint" style="margin-top:10px">请使用 UTF-8 编码。</p>
-        <button type="button" class="btn-secondary" id="btnSaveCsv">上传并导入</button>
-      </div>
-      <p class="import-msg" id="importMsg" aria-live="polite"></p>
     </section>
 
     <section class="card panel-tips">
@@ -215,8 +204,10 @@
       <ul class="tips-list">
         <li>语音使用 Edge 神经语音；每条文案<strong>首次</strong>需联网合成，之后会缓存在服务器 <code>tts_cache</code> 文件夹。</li>
         <li>听写方式请在点击「开始」前选好。<strong>手动</strong>：可按<strong>空格键</strong>（不在输入框内时）或「下一个」进入下一题。<strong>自动</strong>：题目播完后按设定秒数进入下一题，可用「暂停」/「继续」。</li>
+        <li><strong>听英文 · 电脑拼写</strong>：播报英文后在输入框中键入拼写；「提示」先显示巧记（词库中可填 <code>mnemonic</code> / <code>巧记</code>，暂无则显示「暂无巧记」），再点显示原文，之后巧记与原文交替。拼写框内按空格不会跳到下一题。</li>
         <li>「重播题目」会再播两遍当前题；「播报提示」会读出答案一侧（与题目相反：英文 ↔ 中文）。播报中文时只读中文义项，不读词性；义项里的分号在语音中会读成逗号停顿。</li>
-        <li>「录入单词」中，未写单元/部分的词条会归入当前听写设置里所选的单元与部分（若选「全部」则默认 Unit 1 / Lesson 1）。</li>
+        <li>「录入单词」已经独立成整页；未写单元/部分的词条会归入当前听写设置里所选的单元与部分（若选「全部」则默认 Unit 1 / Lesson 1）。</li>
+        <li>单元 <strong>ECDICT 预置</strong> 下的「部分」对应学段：<strong>小学 / 初中 / 高中 / 英语四级 / 英语六级</strong>（依据 <a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noopener noreferrer">ECDICT</a> 的 <code>tag</code> 与词频列；与手动录入的单元无关）。</li>
       </ul>
     </section>
 
@@ -229,7 +220,6 @@
     const $ = (id) => document.getElementById(id);
     const statusEl = $("status");
     const progressEl = $("progress");
-    const importMsg = $("importMsg");
     const historyList = $("historyList");
     const player = $("player");
 
@@ -244,6 +234,31 @@
       });
     }
 
+    function currentDictationMode() {
+      const el = document.querySelector('input[name="dictation_mode"]:checked');
+      return el ? el.value : "en_to_zh";
+    }
+
+    function clearSpellWordState() {
+      $("spellHintBox").classList.add("hidden");
+      $("spellHintText").textContent = "";
+      $("spellHintLabel").textContent = "";
+      $("spellInput").value = "";
+    }
+
+    function updateSpellUi() {
+      const dm = currentDictationMode();
+      const panel = $("spellPanel");
+      panel.classList.toggle("hidden", dm !== "en_spell");
+      panel.setAttribute("aria-hidden", dm !== "en_spell" ? "true" : "false");
+      $("btnHint").textContent = dm === "en_spell" ? "提示" : "播报提示";
+      if (dm !== "en_spell") clearSpellWordState();
+    }
+
+    document.querySelectorAll('input[name="dictation_mode"]').forEach((el) => {
+      el.addEventListener("change", () => updateSpellUi());
+    });
+
     function syncModeRadioSelection() {
       const selected = document.querySelector(`input[name="mode"][value="${sessionMode}"]`);
       if (selected) selected.checked = true;
@@ -257,11 +272,6 @@
     }
 
     function setStatus(t) { statusEl.textContent = t; }
-
-    function setImportMsg(text, ok) {
-      importMsg.textContent = text || "";
-      importMsg.className = "import-msg" + (text ? (ok ? " ok" : " err") : "");
-    }
 
     async function api(path, opts = {}) {
       const r = await fetch(path, {
@@ -353,6 +363,7 @@
       if (modeEl) modeEl.checked = true;
       const dmEl = document.querySelector(`input[name="dictation_mode"][value="${c.dictation_mode}"]`);
       if (dmEl) dmEl.checked = true;
+      updateSpellUi();
       $("interval").value = c.interval;
       progressEl.textContent = c.word_count ? "进度：0/" + c.word_count : "进度：0/0";
       renderHistory(c.history || []);
@@ -377,11 +388,13 @@
       $("lesson").value = d.lesson;
       setDictationModeDisabled(true);
       updateModeControlsState();
+      clearSpellWordState();
       setStatus(d.status || "已恢复听写");
       if (d.warning) alert(d.warning);
       progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
       playUrls(d.audio_urls, () => {
         if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+        if (currentDictationMode() === "en_spell") $("spellInput").focus();
       });
     }
 
@@ -466,10 +479,12 @@
         sessionActive = true;
         setDictationModeDisabled(true);
         updateModeControlsState();
+        clearSpellWordState();
         setStatus(d.status);
         progressEl.textContent = "进度：1/" + d.total;
         playUrls(d.audio_urls, () => {
           if (sessionMode === "auto") scheduleAutoNext();
+          if (s.dictation_mode === "en_spell") $("spellInput").focus();
         });
       } catch (e) {
         setStatus(e.message);
@@ -492,11 +507,14 @@
           sessionActive = false;
           setDictationModeDisabled(false);
           updateModeControlsState();
+          clearSpellWordState();
           await loadConfig();
           return;
         }
+        clearSpellWordState();
         playUrls(d.audio_urls, () => {
           if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
+          if (currentDictationMode() === "en_spell") $("spellInput").focus();
         });
       } catch (e) {
         setStatus(e.message);
@@ -515,7 +533,15 @@
 
     $("btnHint").addEventListener("click", async () => {
       try {
+        const dm = currentDictationMode();
         const d = await api("/api/hint", { method: "POST" });
+        if (dm === "en_spell" && d.hint_text != null && d.hint_text !== "") {
+          const kind = d.hint_kind || "";
+          $("spellHintLabel").textContent = kind === "answer" ? "原文" : "巧记";
+          $("spellHintText").textContent = d.hint_text;
+          $("spellHintBox").classList.remove("hidden");
+          return;
+        }
         playUrls(d.audio_urls);
       } catch (e) {
         setStatus(e.message);
@@ -554,6 +580,7 @@
       player.pause();
       setDictationModeDisabled(false);
       updateModeControlsState();
+      clearSpellWordState();
       try {
         const d = await api("/api/exit", { method: "POST" });
         setStatus(d.status || "已退出。");
@@ -639,86 +666,12 @@
     });
 
     $("btnGotoImport").addEventListener("click", () => {
-      $("word-import").scrollIntoView({ behavior: "smooth", block: "start" });
-      $("addEn").focus();
+      window.location.href = "/import";
     });
 
-    document.querySelectorAll(".tab").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const name = btn.getAttribute("data-tab");
-        document.querySelectorAll(".tab").forEach((b) => {
-          b.classList.toggle("active", b === btn);
-          b.setAttribute("aria-selected", b === btn ? "true" : "false");
-        });
-        ["single", "batch", "csv"].forEach((id) => {
-          $("tab-" + id).classList.toggle("hidden", id !== name);
-        });
-        setImportMsg("");
-      });
-    });
-
-    $("btnSaveSingle").addEventListener("click", async () => {
-      setImportMsg("");
-      try {
-        const d = await api("/api/words/single", {
-          method: "POST",
-          body: {
-            en: $("addEn").value,
-            pos: $("addPos").value,
-            zh: $("addZh").value,
-          },
-        });
-        if (d.message) {
-          setImportMsg(d.message, true);
-        } else {
-          setImportMsg("已保存 " + d.added + " 条，跳过重复 " + d.skipped + " 条。", true);
-          $("addEn").value = "";
-          $("addPos").value = "";
-          $("addZh").value = "";
-        }
-        await loadConfig();
-      } catch (e) {
-        setImportMsg(e.message, false);
-      }
-    });
-
-    $("btnSaveBatch").addEventListener("click", async () => {
-      setImportMsg("");
-      try {
-        const d = await api("/api/words/batch", {
-          method: "POST",
-          body: { text: $("batchText").value },
-        });
-        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
-        if (d.bad_lines) msg += " 无法解析行约 " + d.bad_lines + " 行。";
-        setImportMsg(msg, true);
-        if (d.added) $("batchText").value = "";
-        await loadConfig();
-      } catch (e) {
-        setImportMsg(e.message, false);
-      }
-    });
-
-    $("btnSaveCsv").addEventListener("click", async () => {
-      setImportMsg("");
-      const f = $("csvFile").files[0];
-      if (!f) {
-        setImportMsg("请先选择文件。", false);
-        return;
-      }
-      const fd = new FormData();
-      fd.append("file", f);
-      try {
-        const r = await fetch("/api/words/csv", { method: "POST", body: fd, credentials: "same-origin" });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || r.statusText);
-        let msg = "新增 " + d.added + " 条，跳过重复 " + d.skipped + " 条。";
-        if (d.err_lines) msg += " 问题行约 " + d.err_lines + " 行。";
-        setImportMsg(msg, true);
-        await loadConfig();
-      } catch (e) {
-        setImportMsg(e.message, false);
-      }
+    $("btnSwitchLibrary").addEventListener("click", () => {
+      setStatus("预置词库（小学/初中/高中/大学/四级/六级）入口已预留，功能即将上线。");
+      alert("词库切换入口已预留，预置词库功能即将上线。");
     });
 
     document.addEventListener("keydown", (e) => {
@@ -735,8 +688,13 @@
       $("btnNext").click();
     });
 
-    const ONBOARDING_DISABLED_KEY = "dictation.welcome.disabled";
+    const ONBOARDING_DONE_KEY = "dictation.onboarding.completed";
     const ONBOARDING_VISIT_DAYS_KEY = "dictation.welcome.visitDays";
+    const PREF_DM_KEY = "dictation.pref.dictationMode";
+    const VIEW_WELCOME = "welcome";
+    const VIEW_LIBRARY = "library";
+    const VIEW_DICTATION = "dictation";
+    const VIEW_APP = "app";
 
     function localGetJson(key, fallback) {
       try {
@@ -773,16 +731,16 @@
     }
 
     function welcomeTextByDay(dayCount) {
-      if (dayCount <= 1) return { title: "欢迎你的到来", text: "先用一分钟体验一次听写，马上就能开始。" };
-      if (dayCount <= 3) return { title: `第 ${dayCount} 天见面了`, text: "你已经开始形成学习节奏，继续保持就会很快见效。" };
-      if (dayCount <= 7) return { title: `第 ${dayCount} 天，坚持很棒`, text: "每天一点点，词汇量会在不知不觉中增长。" };
-      return { title: `第 ${dayCount} 天，老朋友欢迎回来`, text: "你已经在稳步前进，今天继续来一轮听写吧。" };
+      if (dayCount <= 1) return "欢迎你的到来。先用一分钟体验一次听写，马上就能开始。";
+      if (dayCount <= 3) return "你已经开始形成学习节奏，继续保持就会很快见效。";
+      if (dayCount <= 7) return "每天一点点，词汇量会在不知不觉中增长。";
+      return "你已经在稳步前进，今天继续来一轮听写吧。";
     }
 
-    function showOnboardingStep(step) {
+    function showOnboardingStep(stepName) {
       document.querySelectorAll(".onboarding-step").forEach((el) => {
-        const s = parseInt(el.getAttribute("data-step"), 10);
-        el.classList.toggle("hidden", s !== step);
+        const s = el.getAttribute("data-step");
+        el.classList.toggle("hidden", s !== stepName);
       });
     }
 
@@ -791,45 +749,102 @@
       document.body.classList.remove("onboarding-open");
     }
 
-    function openOnboarding(dayCount) {
-      const welcome = welcomeTextByDay(dayCount);
-      $("welcomeDayLabel").textContent = `第 ${dayCount} 天`;
-      $("welcomeTitle").textContent = welcome.title;
-      $("welcomeText").textContent = welcome.text;
-      $("toggleWelcomeOff").checked = localStorage.getItem(ONBOARDING_DISABLED_KEY) === "1";
-      showOnboardingStep(1);
+    function openOnboarding(dayCount, stepName) {
+      if (stepName === "welcome") {
+        $("welcomeSplashText").textContent = welcomeTextByDay(dayCount);
+        const act = $("welcomeSplashActions");
+        act.classList.remove("welcome-btn-animate");
+        void act.offsetWidth;
+        requestAnimationFrame(() => act.classList.add("welcome-btn-animate"));
+      }
+      showOnboardingStep(stepName);
       $("onboarding").classList.remove("hidden");
       document.body.classList.add("onboarding-open");
     }
 
-    function initOnboarding() {
-      const dayCount = touchVisitDay();
-      const disabled = localStorage.getItem(ONBOARDING_DISABLED_KEY) === "1";
-      if (!disabled) openOnboarding(dayCount);
+    function isFirstTimeUser() {
+      return localStorage.getItem(ONBOARDING_DONE_KEY) !== "1";
+    }
 
-      $("toggleWelcomeOff").addEventListener("change", (e) => {
-        localStorage.setItem(ONBOARDING_DISABLED_KEY, e.target.checked ? "1" : "0");
-      });
-      $("btnOnboardingNext1").addEventListener("click", () => showOnboardingStep(2));
-      $("btnOnboardingBack2").addEventListener("click", () => showOnboardingStep(1));
-      $("btnOnboardingNext2").addEventListener("click", () => showOnboardingStep(3));
-      $("btnOnboardingBack3").addEventListener("click", () => showOnboardingStep(2));
-      $("linkOnboardingImport").addEventListener("click", () => {
-        closeOnboarding();
-        setTimeout(() => {
-          $("word-import").scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 80);
-      });
-      $("btnOnboardingStart").addEventListener("click", async () => {
-        const quickMode = document.querySelector('input[name="quick_mode"]:checked').value;
-        const quickDm = document.querySelector('input[name="quick_dictation_mode"]:checked').value;
-        const modeEl = document.querySelector(`input[name="mode"][value="${quickMode}"]`);
-        const dmEl = document.querySelector(`input[name="dictation_mode"][value="${quickDm}"]`);
-        if (modeEl) modeEl.checked = true;
+    function currentViewFromUrl() {
+      const u = new URL(window.location.href);
+      const v = u.searchParams.get("view");
+      if (v === VIEW_WELCOME || v === VIEW_LIBRARY || v === VIEW_DICTATION || v === VIEW_APP) return v;
+      return null;
+    }
+
+    function pushView(viewName) {
+      const u = new URL(window.location.href);
+      u.searchParams.set("view", viewName);
+      history.pushState({ view: viewName }, "", u);
+      renderView(viewName);
+    }
+
+    function replaceView(viewName) {
+      const u = new URL(window.location.href);
+      u.searchParams.set("view", viewName);
+      history.replaceState({ view: viewName }, "", u);
+      renderView(viewName);
+    }
+
+    async function applyPreferredSettings() {
+      const preferredDm = localStorage.getItem(PREF_DM_KEY);
+      if (
+        preferredDm &&
+        (preferredDm === "en_to_zh" || preferredDm === "zh_to_en" || preferredDm === "en_spell")
+      ) {
+        const dmEl = document.querySelector(`input[name="dictation_mode"][value="${preferredDm}"]`);
         if (dmEl) dmEl.checked = true;
+        await api("/api/settings", { method: "POST", body: { dictation_mode: preferredDm } }).catch(() => {});
+      }
+    }
+
+    async function renderView(viewName) {
+      const dayCount = touchVisitDay();
+      const firstUser = isFirstTimeUser();
+      if (!firstUser && (viewName === VIEW_LIBRARY || viewName === VIEW_DICTATION)) {
+        replaceView(VIEW_APP);
+        return;
+      }
+      if (viewName === VIEW_APP) {
         closeOnboarding();
-        await api("/api/settings", { method: "POST", body: { mode: quickMode, dictation_mode: quickDm } }).catch(() => {});
-        $("btnStart").click();
+        await applyPreferredSettings();
+        return;
+      }
+      openOnboarding(dayCount, viewName);
+    }
+
+    function initOnboarding() {
+      const firstUser = isFirstTimeUser();
+      const initialView = currentViewFromUrl() || VIEW_WELCOME;
+      if (initialView === VIEW_LIBRARY && !firstUser) {
+        replaceView(VIEW_APP);
+      } else if (initialView === VIEW_DICTATION && !firstUser) {
+        replaceView(VIEW_APP);
+      } else {
+        replaceView(initialView);
+      }
+
+      window.addEventListener("popstate", () => {
+        const v = currentViewFromUrl() || VIEW_WELCOME;
+        renderView(v);
+      });
+
+      $("btnWelcomeEnter").addEventListener("click", () => {
+        if (isFirstTimeUser()) pushView(VIEW_LIBRARY);
+        else pushView(VIEW_APP);
+      });
+      $("btnSetupBackLibrary").addEventListener("click", () => pushView(VIEW_WELCOME));
+      $("btnSetupNextLibrary").addEventListener("click", () => pushView(VIEW_DICTATION));
+      $("btnSetupBackDictation").addEventListener("click", () => pushView(VIEW_LIBRARY));
+      $("btnSetupFinish").addEventListener("click", async () => {
+        const firstDm = document.querySelector('input[name="first_dictation_mode"]:checked').value;
+        localStorage.setItem(PREF_DM_KEY, firstDm);
+        localStorage.setItem(ONBOARDING_DONE_KEY, "1");
+        const dmEl = document.querySelector(`input[name="dictation_mode"][value="${firstDm}"]`);
+        if (dmEl) dmEl.checked = true;
+        await api("/api/settings", { method: "POST", body: { dictation_mode: firstDm } }).catch(() => {});
+        pushView(VIEW_APP);
       });
     }
 
