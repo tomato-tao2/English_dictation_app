@@ -26,6 +26,9 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _DICTATION_MODES = ("en_to_zh", "zh_to_en", "en_spell")
 
+# 拼写会话逐词统计（仅内存；键为 session 内 spell_log_id，避免大列表进 Cookie）
+SPELL_SESSION_BUFFERS: dict[str, list] = {}
+
 
 def _app_secret_key() -> str:
     """稳定会话密钥：优先环境变量，否则读写项目目录下 .flask_secret_key（避免每次重启导致 Cookie 全部失效）。"""
@@ -127,6 +130,45 @@ def logout():
 def index():
     show_logout = bool(_web_password())
     return render_template("index.html", show_logout=show_logout)
+
+
+@app.route("/dictation")
+@app.route("/dictation/")
+@app.route("/tingxie")
+@app.route("/word-dictation")
+@login_required
+def dictation_page():
+    """英语听写独立页（设置与操作见 templates/dictation.html）。多路径避免个别环境路由异常。"""
+    show_logout = bool(_web_password())
+    return render_template("dictation.html", show_logout=show_logout)
+
+
+@app.get("/_debug/who")
+def debug_who():
+    """本机自查：当前进程是否为本项目、是否注册听写路由（勿在生产环境暴露公网）。"""
+    addr = (request.remote_addr or "").split("%")[0]
+    if addr not in ("127.0.0.1", "::1", "localhost"):
+        abort(404)
+    rules = sorted(
+        f"{r.rule!s}  ->  {r.endpoint}" for r in app.url_map.iter_rules()
+    )
+    has_dictation = any(
+        "/dictation" in str(r.rule) or r.endpoint == "dictation_page"
+        for r in app.url_map.iter_rules()
+    )
+    try:
+        mtime = os.path.getmtime(os.path.abspath(__file__))
+    except OSError:
+        mtime = None
+    return jsonify(
+        {
+            "ok": True,
+            "message": "若 has_dictation 为 false，说明运行的不是最新 web_app.py",
+            "has_dictation_route": has_dictation,
+            "web_app_py_mtime": mtime,
+            "registered_rules": rules,
+        }
+    )
 
 
 @app.route("/import")
@@ -234,6 +276,89 @@ def _reset_spell_hint_clicks() -> None:
     session["spell_hint_clicks"] = 0
 
 
+def _init_spell_session_log() -> None:
+    """开始 / 恢复拼写听写时创建空缓冲。"""
+    lid = secrets.token_hex(8)
+    session["spell_log_id"] = lid
+    SPELL_SESSION_BUFFERS[lid] = []
+
+
+def _clear_spell_session_log() -> None:
+    lid = session.pop("spell_log_id", None)
+    if lid:
+        SPELL_SESSION_BUFFERS.pop(lid, None)
+
+
+def _finalize_current_spell_row(filtered: list, idx: int) -> None:
+    """离开当前词前写入一行拼写统计（不改变 index）。"""
+    if session.get("dictation_mode") != "en_spell":
+        return
+    log_id = session.get("spell_log_id")
+    if not log_id or not filtered or not (0 <= idx < len(filtered)):
+        return
+    w = filtered[idx]
+    hints = int(session.get("spell_hint_clicks", 0))
+    attempt = session.pop("spell_last_attempt", None)
+    correct = session.pop("spell_last_correct", None)
+    submitted = attempt is not None
+    row = {
+        "en": str(w.get("en", "")).strip(),
+        "zh": str(w.get("zh", "")).strip(),
+        "hint_count": hints,
+        "submitted": submitted,
+        "attempt": str(attempt).strip() if submitted else "",
+        "correct": bool(correct) if submitted else None,
+    }
+    SPELL_SESSION_BUFFERS.setdefault(log_id, []).append(row)
+
+
+def _take_spell_summary_and_clear_buffer() -> dict | None:
+    """生成 spell_summary 并移除缓冲；若无 log 或无数据则返回 None。"""
+    log_id = session.pop("spell_log_id", None)
+    if not log_id:
+        return None
+    rows = list(SPELL_SESSION_BUFFERS.pop(log_id, None) or [])
+    if not rows:
+        return None
+    answered = sum(1 for r in rows if r.get("submitted"))
+    correct_n = sum(1 for r in rows if r.get("submitted") and r.get("correct") is True)
+    unanswer = sum(1 for r in rows if not r.get("submitted"))
+    hint_used_words = sum(1 for r in rows if int(r.get("hint_count", 0)) > 0)
+    wrong_rows = [
+        {"en": r["en"], "zh": r["zh"], "attempt": r.get("attempt", "")}
+        for r in rows
+        if r.get("submitted") and r.get("correct") is False
+    ]
+    unsubmitted_rows = [{"en": r["en"], "zh": r["zh"]} for r in rows if not r.get("submitted")]
+    hint_rows = [
+        {"en": r["en"], "zh": r["zh"], "hint_count": int(r.get("hint_count", 0))}
+        for r in rows
+        if int(r.get("hint_count", 0)) > 0
+    ]
+    return {
+        "stats": {
+            "answered": answered,
+            "correct": correct_n,
+            "unanswered": unanswer,
+            "hint_used_words": hint_used_words,
+        },
+        "wrong_rows": wrong_rows,
+        "unsubmitted_rows": unsubmitted_rows,
+        "hint_rows": hint_rows,
+    }
+
+
+def _persist_spell_wrongs_and_maybe_append(summary: dict | None) -> None:
+    if not summary:
+        return
+    wrong = summary.get("wrong_rows") or []
+    if not wrong:
+        return
+    unit = str(session.get("unit", "全部单元") or "全部单元")
+    lesson = str(session.get("lesson", "全部部分") or "全部部分")
+    dc.append_wrong_spell_entries(wrong, unit=unit, lesson=lesson)
+
+
 def _prompt_urls(word: dict) -> list[str]:
     dm = session.get("dictation_mode", "en_to_zh")
     text, lang = dc.prompt_text_and_language(word, dm)
@@ -276,6 +401,11 @@ def _resume_payload_from_record(record: dict) -> tuple[dict | None, str | None]:
     session["session_active"] = True
     session["auto_paused"] = False
     _reset_spell_hint_clicks()
+    session.pop("spell_last_attempt", None)
+    session.pop("spell_last_correct", None)
+    _clear_spell_session_log()
+    if session.get("dictation_mode") == "en_spell":
+        _init_spell_session_log()
     word = filtered[resolved]
     urls = _prompt_urls(word)
     payload = {
@@ -321,6 +451,11 @@ def api_start():
     session["session_active"] = True
     session["auto_paused"] = False
     _reset_spell_hint_clicks()
+    session.pop("spell_last_attempt", None)
+    session.pop("spell_last_correct", None)
+    _clear_spell_session_log()
+    if session.get("dictation_mode") == "en_spell":
+        _init_spell_session_log()
     word = filtered[0]
     urls = _prompt_urls(word)
     total = len(filtered)
@@ -350,17 +485,22 @@ def api_next():
     lesson = session.get("lesson", "全部部分")
 
     if idx >= len(filtered) - 1:
+        _finalize_current_spell_row(filtered, idx)
         dc.save_last_progress(unit, lesson, status="completed")
         session["session_active"] = False
-        return jsonify(
-            {
-                "ok": True,
-                "done": True,
-                "status": "全部完成。",
-                "audio_urls": [],
-            }
-        )
+        spell_summary = _take_spell_summary_and_clear_buffer()
+        _persist_spell_wrongs_and_maybe_append(spell_summary)
+        payload = {
+            "ok": True,
+            "done": True,
+            "status": "全部完成。",
+            "audio_urls": [],
+        }
+        if spell_summary:
+            payload["spell_summary"] = spell_summary
+        return jsonify(payload)
 
+    _finalize_current_spell_row(filtered, idx)
     session["index"] = idx + 1
     _reset_spell_hint_clicks()
     word = filtered[session["index"]]
@@ -419,6 +559,29 @@ def api_hint():
     return jsonify({"audio_urls": [url]})
 
 
+@app.post("/api/spell/submit")
+@login_required
+def api_spell_submit():
+    _session_defaults()
+    if not session.get("session_active", False):
+        return jsonify({"error": "请先开始听写"}), 400
+    if session.get("dictation_mode") != "en_spell":
+        return jsonify({"error": "仅拼写模式可用"}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    if not text:
+        return jsonify({"error": "请输入拼写后再确认"}), 400
+    filtered = _current_filtered()
+    idx = session.get("index", 0)
+    if not filtered or not (0 <= idx < len(filtered)):
+        return jsonify({"error": "没有当前单词"}), 400
+    word = filtered[idx]
+    ok = dc.spell_attempt_matches_word(word, text)
+    session["spell_last_attempt"] = text
+    session["spell_last_correct"] = ok
+    return jsonify({"ok": True, "recorded": True})
+
+
 @app.post("/api/test-voice")
 @login_required
 def api_test_voice():
@@ -455,6 +618,9 @@ def api_exit():
     if filtered and 0 <= idx < len(filtered):
         word = filtered[idx]
 
+    if session.get("session_active") and session.get("dictation_mode") == "en_spell":
+        _finalize_current_spell_row(filtered, idx)
+
     dc.save_last_progress(unit, lesson, word=word, index=idx, status="exited")
     session["session_active"] = False
     session["auto_paused"] = True
@@ -462,18 +628,22 @@ def api_exit():
     word_en = str(word.get("en", "")).strip() if word else ""
     word_zh = str(word.get("zh", "")).strip() if word else ""
 
+    spell_summary = _take_spell_summary_and_clear_buffer()
+    _persist_spell_wrongs_and_maybe_append(spell_summary)
+
     status = "已退出（已记忆当前单词）" if word_en or word_zh else "已退出。"
-    return jsonify(
-        {
-            "ok": True,
-            "status": status,
-            "index": idx,
-            "total": len(filtered),
-            "word_en": word_en,
-            "word_zh": word_zh,
-            "last_progress": dc.load_last_progress_text(),
-        }
-    )
+    out = {
+        "ok": True,
+        "status": status,
+        "index": idx,
+        "total": len(filtered),
+        "word_en": word_en,
+        "word_zh": word_zh,
+        "last_progress": dc.load_last_progress_text(),
+    }
+    if spell_summary:
+        out["spell_summary"] = spell_summary
+    return jsonify(out)
 
 
 @app.route("/api/resume", methods=["GET", "POST"])
@@ -509,6 +679,21 @@ def api_resume_history():
     if err:
         return jsonify({"error": err}), 400
     return jsonify(payload)
+
+
+@app.post("/api/progress/history/delete")
+@login_required
+def api_progress_history_delete():
+    _session_defaults()
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        history_index = int(data.get("history_index", -1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "history_index 无效"}), 400
+    ok, err = dc.delete_progress_history_item(history_index)
+    if not ok:
+        return jsonify({"error": err or "删除失败"}), 400
+    return jsonify({"ok": True})
 
 
 @app.post("/api/words/single")
@@ -611,6 +796,23 @@ def api_words_csv():
 
 
 if __name__ == "__main__":
+    import sys
+
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     host = os.environ.get("FLASK_HOST", "127.0.0.1")
     port = int(os.environ.get("FLASK_PORT", "5000"))
+    print("=" * 56)
+    print("英语单词听写  Web 服务")
+    print("  首页:   http://%s:%s/" % (host, port))
+    print("  听写页: http://%s:%s/dictation （备用: /tingxie）" % (host, port))
+    print("  录入页: http://%s:%s/import" % (host, port))
+    print("  自查:   http://%s:%s/_debug/who （若听写 404 先打开此项）" % (host, port))
+    if not any(r.rule == "/dictation" for r in app.url_map.iter_rules()):
+        print("  [错误] 未注册 /dictation，请确认 web_app.py 已保存为最新版本。")
+    print("=" * 56)
     app.run(host=host, port=port, debug=False)

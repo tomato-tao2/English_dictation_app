@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>英语听写 — 英语单词听写</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-dictation-app">
+  <div class="page-bg" aria-hidden="true"></div>
+  <div class="wrap dictation-app-wrap">
+    <header class="dictation-topbar">
+      <a class="dictation-back" href="{{ url_for('index', view='app') }}">← 返回主界面</a>
+      <h1 class="dictation-title">英语听写</h1>
+      <div class="dictation-topbar-actions">
+        <button type="button" class="btn-icon-gear" id="btnSettingsOpen" title="听写设置" aria-label="听写设置">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+        {% if show_logout %}
+        <a class="link-out dictation-logout" href="{{ url_for('logout') }}">退出</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="dictation-stage" aria-live="polite">
+      <p class="dictation-progress-huge" id="progressStage">加载中…</p>
+      <p class="dictation-status-line" id="status">就绪</p>
+    </main>
+
+    <div id="spellPanel" class="spell-panel dictation-spell-above-controls hidden" aria-hidden="true">
+      <div class="spell-row">
+        <label for="spellInput" class="spell-label">键入拼写</label>
+        <div class="spell-input-line">
+          <input
+            type="text"
+            id="spellInput"
+            class="spell-input"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="在此输入英文"
+          />
+          <button type="button" class="btn-spell-confirm" id="btnSpellConfirm" title="确认拼写（Enter 同效）">
+            确认
+          </button>
+        </div>
+      </div>
+      <div id="spellHintBox" class="spell-hint-box hidden" aria-live="polite">
+        <span class="spell-hint-label" id="spellHintLabel"></span>
+        <span class="spell-hint-text" id="spellHintText"></span>
+      </div>
+    </div>
+
+    <section class="dictation-controls-wrap">
+      <div class="action-groups dictation-action-groups">
+        <div class="action-group">
+          <p class="action-group-title">听写控制</p>
+          <div class="actions">
+            <button type="button" id="btnStart" class="action-start">开始</button>
+            <button type="button" id="btnPause" class="action-secondary">暂停</button>
+            <button type="button" class="btn-outline action-secondary" id="btnExit" title="退出听写并记忆当前单词">退出</button>
+          </div>
+        </div>
+        <div class="action-group">
+          <p class="action-group-title">听写辅助</p>
+          <div class="actions">
+            <button type="button" id="btnNext" class="action-secondary">下一个</button>
+            <button type="button" id="btnReplay" class="action-secondary">重播题目</button>
+            <button type="button" id="btnHint" class="action-secondary">播报提示</button>
+          </div>
+        </div>
+        <div class="action-group">
+          <p class="action-group-title">管理入口</p>
+          <div class="actions">
+            <button type="button" class="btn-outline action-secondary" id="btnGotoImport" title="跳转到录入页面">录入单词</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer-note dictation-footer-note">修改词库后刷新本页即可加载最新单词。</p>
+
+    <audio id="player" preload="none"></audio>
+  </div>
+
+  <!-- 听写小结（拼写模式汇总） -->
+  <div id="summaryModal" class="summary-modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="summaryModalTitle">
+    <div class="settings-modal-backdrop" id="summaryModalBackdrop"></div>
+    <div class="summary-modal-panel card">
+      <div class="settings-modal-head">
+        <h2 class="card-title" id="summaryModalTitle">听写小结</h2>
+        <button type="button" class="btn-modal-close" id="btnSummaryClose" aria-label="关闭">×</button>
+      </div>
+      <div class="summary-modal-body">
+        <p class="summary-intro" id="summaryIntro"></p>
+        <p class="meta muted summary-note" id="summaryNote"></p>
+        <div id="summaryWrongWrap" class="summary-table-wrap">
+          <h3 class="summary-section-title">拼写错误</h3>
+          <div class="summary-table-scroll">
+            <table class="summary-table" id="summaryWrongTable">
+              <thead>
+                <tr>
+                  <th>正确英文</th>
+                  <th>正确中文</th>
+                  <th>你输入的拼写</th>
+                </tr>
+              </thead>
+              <tbody id="summaryWrongTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="summaryUnsubmittedWrap" class="summary-table-wrap">
+          <h3 class="summary-section-title">未点击确认</h3>
+          <div class="summary-table-scroll">
+            <table class="summary-table" id="summaryUnsubmittedTable">
+              <thead>
+                <tr>
+                  <th>正确英文</th>
+                  <th>正确中文</th>
+                  <th>备注</th>
+                </tr>
+              </thead>
+              <tbody id="summaryUnsubmittedTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="summaryHintWrap" class="summary-table-wrap">
+          <h3 class="summary-section-title">使用过提示的单词</h3>
+          <div class="summary-table-scroll">
+            <table class="summary-table" id="summaryHintTable">
+              <thead>
+                <tr>
+                  <th>英文</th>
+                  <th>中文</th>
+                  <th>提示次数</th>
+                </tr>
+              </thead>
+              <tbody id="summaryHintTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 听写设置弹层 -->
+  <div id="settingsModal" class="settings-modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="settings-modal-backdrop" id="settingsModalBackdrop"></div>
+    <div class="settings-modal-panel card">
+      <div class="settings-modal-head">
+        <h2 class="card-title" id="settingsModalTitle">听写设置</h2>
+        <button type="button" class="btn-modal-close" id="btnSettingsClose" aria-label="关闭">×</button>
+      </div>
+      <div class="settings-modal-body">
+        <p class="meta library-meta">
+          词库：<span id="currentLibraryLabel">当前词库（words.json）</span>
+          <button type="button" class="library-switch-btn" id="btnSwitchLibrary" title="预置词库功能即将上线">切换词库</button>
+        </p>
+        <div class="row">
+          <label>模式</label>
+          <label><input type="radio" name="mode" value="manual" checked /> 手动</label>
+          <label><input type="radio" name="mode" value="auto" /> 自动</label>
+        </div>
+        <div class="row">
+          <label>听写方式</label>
+          <label><input type="radio" name="dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
+          <label><input type="radio" name="dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
+          <label><input type="radio" name="dictation_mode" value="en_spell" /> 听英文 · 电脑拼写</label>
+        </div>
+        <div class="row grid-3">
+          <div>
+            <label for="unit">单元</label>
+            <select id="unit"></select>
+          </div>
+          <div>
+            <label for="lesson">部分</label>
+            <select id="lesson"></select>
+          </div>
+          <div>
+            <label for="interval">间隔（秒）</label>
+            <input type="number" id="interval" min="1" value="10" />
+          </div>
+        </div>
+        <p class="meta" id="progress">进度：—</p>
+        <p class="meta muted" id="lastProgress"></p>
+        <div class="resume-toolbar">
+          <button type="button" class="btn-outline btn-resume-last" id="btnResumeLast">继续上次</button>
+          <span class="history-link" id="btnHistoryToggle" role="button" tabindex="0" aria-expanded="false">历史记录</span>
+        </div>
+        <div id="historyPanel" class="history-panel hidden">
+          <ul id="historyList" class="history-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='dictation.js') }}"></script>
+</body>
+</html>

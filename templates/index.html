@@ -93,12 +93,23 @@
         </div>
         <div class="hero-copy">
           <p class="hero-lead">每天几分钟，耳朵跟着词走。</p>
-          <p class="hero-sub">听写、录入都在这一页；以后还会挂上更多学习小工具。</p>
-          <div class="hero-chips">
+          <p class="hero-sub">在这里了解我们提供哪些学习功能；进入具体功能后，再展开设置与操作。</p>
+          <div class="home-feature-grid">
+            <a class="home-feature-card home-feature-card--primary" href="/dictation">
+              <span class="home-feature-kicker">核心功能</span>
+              <strong class="home-feature-name">英语听写</strong>
+              <span class="home-feature-desc">按词库范围听写，支持手动 / 自动下一题与拼写模式。若本页进不去，请在地址栏试 <code>/tingxie</code>，或打开 <code>/_debug/who</code> 查看当前服务是否为本项目。</span>
+            </a>
+            <button type="button" class="home-feature-card home-feature-card--disabled" disabled title="敬请期待">
+              <span class="home-feature-kicker">即将开放</span>
+              <strong class="home-feature-name">更多功能</strong>
+              <span class="home-feature-desc">错题回顾、学习统计等将陆续上线</span>
+            </button>
+          </div>
+          <div class="hero-chips hero-chips--secondary">
+            <a class="hero-chip hero-chip--link" href="/import">去录入单词</a>
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">错题回顾</button>
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">学习统计</button>
-            <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">词表导出</button>
-            <a class="hero-chip hero-chip--link" href="/import">去录入单词</a>
           </div>
         </div>
       </div>
@@ -109,169 +120,11 @@
       </aside>
     </section>
 
-    <section class="card panel-settings">
-      <h2 class="card-title">听写设置</h2>
-      <p class="meta library-meta">
-        词库：<span id="currentLibraryLabel">当前词库（words.json）</span>
-        <button type="button" class="library-switch-btn" id="btnSwitchLibrary" title="预置词库功能即将上线">切换词库</button>
-      </p>
-      <div class="row">
-        <label>模式</label>
-        <label><input type="radio" name="mode" value="manual" checked /> 手动</label>
-        <label><input type="radio" name="mode" value="auto" /> 自动</label>
-      </div>
-      <div class="row">
-        <label>听写方式</label>
-        <label><input type="radio" name="dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
-        <label><input type="radio" name="dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
-        <label><input type="radio" name="dictation_mode" value="en_spell" /> 听英文 · 电脑拼写</label>
-      </div>
-      <div class="row grid-3">
-        <div>
-          <label for="unit">单元</label>
-          <select id="unit"></select>
-        </div>
-        <div>
-          <label for="lesson">部分</label>
-          <select id="lesson"></select>
-        </div>
-        <div>
-          <label for="interval">间隔（秒）</label>
-          <input type="number" id="interval" min="1" value="10" />
-        </div>
-      </div>
-      <p class="meta" id="progress">进度：—</p>
-      <p class="meta muted" id="lastProgress"></p>
-      <div class="resume-toolbar">
-        <button type="button" class="btn-outline btn-resume-last" id="btnResumeLast">继续上次</button>
-        <span class="history-link" id="btnHistoryToggle" role="button" tabindex="0" aria-expanded="false">历史记录</span>
-      </div>
-      <div id="historyPanel" class="history-panel hidden">
-        <ul id="historyList" class="history-list"></ul>
-      </div>
-    </section>
-
-    <section class="card panel-actions">
-      <h2 class="card-title">操作</h2>
-      <div class="action-groups">
-        <div class="action-group">
-          <p class="action-group-title">听写控制</p>
-          <div class="actions">
-            <button type="button" id="btnStart" class="action-start">开始</button>
-            <button type="button" id="btnPause" class="action-secondary">暂停</button>
-            <button type="button" class="btn-outline action-secondary" id="btnExit" title="退出听写并记忆当前单词">退出</button>
-          </div>
-        </div>
-        <div class="action-group">
-          <p class="action-group-title">听写辅助</p>
-          <div class="actions">
-            <button type="button" id="btnNext" class="action-secondary">下一个</button>
-            <button type="button" id="btnReplay" class="action-secondary">重播题目</button>
-            <button type="button" id="btnHint" class="action-secondary">播报提示</button>
-          </div>
-        </div>
-        <div class="action-group">
-          <p class="action-group-title">管理入口</p>
-          <div class="actions">
-            <button type="button" class="btn-outline action-secondary" id="btnGotoImport" title="跳转到录入页面">录入单词</button>
-          </div>
-        </div>
-      </div>
-      <div id="spellPanel" class="spell-panel hidden" aria-hidden="true">
-        <div class="spell-row">
-          <label for="spellInput" class="spell-label">键入拼写</label>
-          <input
-            type="text"
-            id="spellInput"
-            class="spell-input"
-            autocomplete="off"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            placeholder="在此输入英文"
-          />
-        </div>
-        <div id="spellHintBox" class="spell-hint-box hidden" aria-live="polite">
-          <span class="spell-hint-label" id="spellHintLabel"></span>
-          <span class="spell-hint-text" id="spellHintText"></span>
-        </div>
-      </div>
-      <p class="status" id="status">就绪</p>
-    </section>
-
-    <section class="card panel-tips">
-      <h2 class="card-title">使用说明</h2>
-      <ul class="tips-list">
-        <li>语音使用 Edge 神经语音；每条文案<strong>首次</strong>需联网合成，之后会缓存在服务器 <code>tts_cache</code> 文件夹。</li>
-        <li>听写方式请在点击「开始」前选好。<strong>手动</strong>：可按<strong>空格键</strong>（不在输入框内时）或「下一个」进入下一题。<strong>自动</strong>：题目播完后按设定秒数进入下一题，可用「暂停」/「继续」。</li>
-        <li><strong>听英文 · 电脑拼写</strong>：播报英文后在输入框中键入拼写；「提示」先显示巧记（词库中可填 <code>mnemonic</code> / <code>巧记</code>，暂无则显示「暂无巧记」），再点显示原文，之后巧记与原文交替。拼写框内按空格不会跳到下一题。</li>
-        <li>「重播题目」会再播两遍当前题；「播报提示」会读出答案一侧（与题目相反：英文 ↔ 中文）。播报中文时只读中文义项，不读词性；义项里的分号在语音中会读成逗号停顿。</li>
-        <li>「录入单词」已经独立成整页；未写单元/部分的词条会归入当前听写设置里所选的单元与部分（若选「全部」则默认 Unit 1 / Lesson 1）。</li>
-        <li>单元 <strong>ECDICT 预置</strong> 下的「部分」对应学段：<strong>小学 / 初中 / 高中 / 英语四级 / 英语六级</strong>（依据 <a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noopener noreferrer">ECDICT</a> 的 <code>tag</code> 与词频列；与手动录入的单元无关）。</li>
-      </ul>
-    </section>
-
-    <p class="footer-note">修改词库后刷新本页即可加载最新单词。</p>
-
-    <audio id="player" preload="none"></audio>
+    <p class="footer-note home-footer-note">听写与详细说明请进入「英语听写」功能页。</p>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const statusEl = $("status");
-    const progressEl = $("progress");
-    const historyList = $("historyList");
-    const player = $("player");
-
-    let autoTimer = null;
-    let sessionMode = "manual";
-    let autoPaused = false;
-    let sessionActive = false;
-
-    function setDictationModeDisabled(disabled) {
-      document.querySelectorAll('input[name="dictation_mode"]').forEach((el) => {
-        el.disabled = !!disabled;
-      });
-    }
-
-    function currentDictationMode() {
-      const el = document.querySelector('input[name="dictation_mode"]:checked');
-      return el ? el.value : "en_to_zh";
-    }
-
-    function clearSpellWordState() {
-      $("spellHintBox").classList.add("hidden");
-      $("spellHintText").textContent = "";
-      $("spellHintLabel").textContent = "";
-      $("spellInput").value = "";
-    }
-
-    function updateSpellUi() {
-      const dm = currentDictationMode();
-      const panel = $("spellPanel");
-      panel.classList.toggle("hidden", dm !== "en_spell");
-      panel.setAttribute("aria-hidden", dm !== "en_spell" ? "true" : "false");
-      $("btnHint").textContent = dm === "en_spell" ? "提示" : "播报提示";
-      if (dm !== "en_spell") clearSpellWordState();
-    }
-
-    document.querySelectorAll('input[name="dictation_mode"]').forEach((el) => {
-      el.addEventListener("change", () => updateSpellUi());
-    });
-
-    function syncModeRadioSelection() {
-      const selected = document.querySelector(`input[name="mode"][value="${sessionMode}"]`);
-      if (selected) selected.checked = true;
-    }
-
-    function updateModeControlsState() {
-      const locked = sessionActive && sessionMode === "auto" && !autoPaused;
-      document.querySelectorAll('input[name="mode"]').forEach((el) => {
-        el.disabled = locked;
-      });
-    }
-
-    function setStatus(t) { statusEl.textContent = t; }
 
     async function api(path, opts = {}) {
       const r = await fetch(path, {
@@ -284,409 +137,6 @@
       if (!r.ok) throw new Error(data.error || r.statusText);
       return data;
     }
-
-    function clearAutoTimer() {
-      if (autoTimer) {
-        clearTimeout(autoTimer);
-        autoTimer = null;
-      }
-    }
-
-    function playUrls(urls, onDone) {
-      if (!urls || !urls.length) {
-        if (onDone) onDone();
-        return;
-      }
-      let i = 0;
-      function step() {
-        if (i >= urls.length) {
-          if (onDone) onDone();
-          return;
-        }
-        player.src = urls[i];
-        i += 1;
-        player.onended = step;
-        player.play().catch((e) => setStatus("无法播放音频：" + e.message));
-      }
-      step();
-    }
-
-    function scheduleAutoNext() {
-      clearAutoTimer();
-      if (!sessionActive) return;
-      if (sessionMode !== "auto" || autoPaused) return;
-      const sec = parseInt($("interval").value, 10) || 10;
-      autoTimer = setTimeout(async () => {
-        autoTimer = null;
-        if (!sessionActive) return;
-        if (autoPaused || sessionMode !== "auto") return;
-        try {
-          const d = await api("/api/next", { method: "POST" });
-          setStatus(d.status || "");
-          progressEl.textContent = "进度：" + (d.total ? (d.index + 1) + "/" + d.total : "—");
-          if (d.done) {
-            sessionActive = false;
-            return;
-          }
-          playUrls(d.audio_urls, () => {
-            if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
-          });
-        } catch (e) {
-          setStatus(e.message);
-        }
-      }, sec * 1000);
-    }
-
-    async function loadConfig() {
-      const c = await api("/api/config");
-      $("lastProgress").textContent = c.last_progress || "";
-      $("currentLibraryLabel").textContent = c.current_library_label || "当前词库（words.json）";
-      const unitSel = $("unit");
-      const lessonSel = $("lesson");
-      unitSel.innerHTML = "";
-      c.units.forEach((u) => {
-        const o = document.createElement("option");
-        o.value = u;
-        o.textContent = u;
-        if (u === c.unit) o.selected = true;
-        unitSel.appendChild(o);
-      });
-      lessonSel.innerHTML = "";
-      c.lessons.forEach((l) => {
-        const o = document.createElement("option");
-        o.value = l;
-        o.textContent = l;
-        if (l === c.lesson) o.selected = true;
-        lessonSel.appendChild(o);
-      });
-      const modeEl = document.querySelector(`input[name="mode"][value="${c.mode}"]`);
-      if (modeEl) modeEl.checked = true;
-      const dmEl = document.querySelector(`input[name="dictation_mode"][value="${c.dictation_mode}"]`);
-      if (dmEl) dmEl.checked = true;
-      updateSpellUi();
-      $("interval").value = c.interval;
-      progressEl.textContent = c.word_count ? "进度：0/" + c.word_count : "进度：0/0";
-      renderHistory(c.history || []);
-    }
-
-    function historyText(it) {
-      const ts = it.ts || "";
-      const unit = it.unit || "全部单元";
-      const lesson = it.lesson || "全部部分";
-      const en = it.word_en || "";
-      const zh = it.word_zh || "";
-      const st = it.status === "completed" ? "完成" : "退出";
-      return `${ts}｜${unit} / ${lesson}｜${st}${en || zh ? `｜${en}${zh ? " / " + zh : ""}` : ""}`;
-    }
-
-    async function resumeWithPayload(d) {
-      sessionActive = true;
-      const s = readSettings();
-      sessionMode = s.mode;
-      $("btnPause").textContent = "暂停";
-      $("unit").value = d.unit;
-      $("lesson").value = d.lesson;
-      setDictationModeDisabled(true);
-      updateModeControlsState();
-      clearSpellWordState();
-      setStatus(d.status || "已恢复听写");
-      if (d.warning) alert(d.warning);
-      progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
-      playUrls(d.audio_urls, () => {
-        if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
-        if (currentDictationMode() === "en_spell") $("spellInput").focus();
-      });
-    }
-
-    function renderHistory(items) {
-      historyList.innerHTML = "";
-      if (!items.length) {
-        const li = document.createElement("li");
-        li.textContent = "暂无历史记录。";
-        historyList.appendChild(li);
-        return;
-      }
-      items.forEach((it, idx) => {
-        const li = document.createElement("li");
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "history-item-btn";
-        b.textContent = historyText(it);
-        b.addEventListener("click", async () => {
-          clearAutoTimer();
-          autoPaused = false;
-          try {
-            const d = await api("/api/resume/history", {
-              method: "POST",
-              body: { history_index: idx },
-            });
-            await resumeWithPayload(d);
-            await loadConfig();
-          } catch (e) {
-            setStatus(e.message);
-          }
-        });
-        li.appendChild(b);
-        historyList.appendChild(li);
-      });
-    }
-
-    function readSettings() {
-      return {
-        unit: $("unit").value,
-        lesson: $("lesson").value,
-        mode: document.querySelector('input[name="mode"]:checked').value,
-        dictation_mode: document.querySelector('input[name="dictation_mode"]:checked').value,
-        interval: parseInt($("interval").value, 10) || 10,
-      };
-    }
-
-    $("unit").addEventListener("change", async () => {
-      await api("/api/settings", { method: "POST", body: { unit: $("unit").value } });
-      const c = await api("/api/config");
-      const lessonSel = $("lesson");
-      lessonSel.innerHTML = "";
-      c.lessons.forEach((l) => {
-        const o = document.createElement("option");
-        o.value = l;
-        o.textContent = l;
-        if (l === c.lesson) o.selected = true;
-        lessonSel.appendChild(o);
-      });
-      progressEl.textContent = "进度：0/" + c.word_count;
-    });
-
-    $("lesson").addEventListener("change", async () => {
-      await api("/api/settings", {
-        method: "POST",
-        body: { unit: $("unit").value, lesson: $("lesson").value },
-      });
-      const c = await api("/api/config");
-      progressEl.textContent = "进度：0/" + c.word_count;
-    });
-
-    $("btnStart").addEventListener("click", async () => {
-      clearAutoTimer();
-      const s = readSettings();
-      sessionMode = s.mode;
-      autoPaused = false;
-      sessionActive = false;
-      $("btnPause").textContent = "暂停";
-      syncModeRadioSelection();
-      updateModeControlsState();
-      try {
-        const d = await api("/api/start", { method: "POST", body: s });
-        sessionActive = true;
-        setDictationModeDisabled(true);
-        updateModeControlsState();
-        clearSpellWordState();
-        setStatus(d.status);
-        progressEl.textContent = "进度：1/" + d.total;
-        playUrls(d.audio_urls, () => {
-          if (sessionMode === "auto") scheduleAutoNext();
-          if (s.dictation_mode === "en_spell") $("spellInput").focus();
-        });
-      } catch (e) {
-        setStatus(e.message);
-      }
-      await loadConfig();
-    });
-
-    $("btnNext").addEventListener("click", async () => {
-      clearAutoTimer();
-      if (!sessionActive) {
-        setStatus("已退出，点击「开始」继续。");
-        return;
-      }
-      try {
-        const d = await api("/api/next", { method: "POST" });
-        setStatus(d.status);
-        if (d.total != null && d.index != null)
-          progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
-        if (d.done) {
-          sessionActive = false;
-          setDictationModeDisabled(false);
-          updateModeControlsState();
-          clearSpellWordState();
-          await loadConfig();
-          return;
-        }
-        clearSpellWordState();
-        playUrls(d.audio_urls, () => {
-          if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
-          if (currentDictationMode() === "en_spell") $("spellInput").focus();
-        });
-      } catch (e) {
-        setStatus(e.message);
-      }
-    });
-
-    $("btnReplay").addEventListener("click", async () => {
-      try {
-        const d = await api("/api/replay", { method: "POST" });
-        setStatus(d.status);
-        playUrls(d.audio_urls);
-      } catch (e) {
-        setStatus(e.message);
-      }
-    });
-
-    $("btnHint").addEventListener("click", async () => {
-      try {
-        const dm = currentDictationMode();
-        const d = await api("/api/hint", { method: "POST" });
-        if (dm === "en_spell" && d.hint_text != null && d.hint_text !== "") {
-          const kind = d.hint_kind || "";
-          $("spellHintLabel").textContent = kind === "answer" ? "原文" : "巧记";
-          $("spellHintText").textContent = d.hint_text;
-          $("spellHintBox").classList.remove("hidden");
-          return;
-        }
-        playUrls(d.audio_urls);
-      } catch (e) {
-        setStatus(e.message);
-      }
-    });
-
-    $("btnPause").addEventListener("click", async () => {
-      try {
-        const d = await api("/api/pause", { method: "POST" });
-        autoPaused = d.paused;
-        $("btnPause").textContent = d.paused ? "继续" : "暂停";
-        if (d.paused) {
-          clearAutoTimer();
-          player.pause();
-        } else if (sessionMode === "auto") {
-          // 继续时先重播当前题两遍，再恢复自动计时。
-          const rp = await api("/api/replay", { method: "POST" });
-          playUrls(rp.audio_urls, () => {
-            if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
-          });
-        }
-        updateModeControlsState();
-      } catch (e) {
-        setStatus(e.message);
-      }
-    });
-
-    $("btnExit").addEventListener("click", async () => {
-      if (!sessionActive) {
-        setStatus("未在听写中。");
-        return;
-      }
-      clearAutoTimer();
-      autoPaused = true;
-      sessionActive = false;
-      player.pause();
-      setDictationModeDisabled(false);
-      updateModeControlsState();
-      clearSpellWordState();
-      try {
-        const d = await api("/api/exit", { method: "POST" });
-        setStatus(d.status || "已退出。");
-        if (d.total && d.index != null) {
-          progressEl.textContent = "进度：" + (d.index + 1) + "/" + d.total;
-        }
-        if (d.last_progress) $("lastProgress").textContent = d.last_progress;
-        await loadConfig();
-      } catch (e) {
-        setStatus(e.message);
-      }
-    });
-
-    $("btnResumeLast").addEventListener("click", async () => {
-      clearAutoTimer();
-      autoPaused = false;
-      $("btnPause").textContent = "暂停";
-      try {
-        const d = await api("/api/resume", { method: "POST" });
-        await resumeWithPayload(d);
-      } catch (e) {
-        setStatus(e.message);
-      }
-      await loadConfig();
-    });
-
-    function toggleHistoryPanel() {
-      const panel = $("historyPanel");
-      const show = panel.classList.contains("hidden");
-      panel.classList.toggle("hidden", !show);
-      $("btnHistoryToggle").setAttribute("aria-expanded", show ? "true" : "false");
-    }
-    $("btnHistoryToggle").addEventListener("click", toggleHistoryPanel);
-    $("btnHistoryToggle").addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggleHistoryPanel();
-      }
-    });
-
-    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-      radio.addEventListener("change", async () => {
-        const picked = document.querySelector('input[name="mode"]:checked').value;
-        if (!sessionActive) {
-          sessionMode = picked;
-          autoPaused = false;
-          updateModeControlsState();
-          return;
-        }
-
-        if (sessionMode === "auto" && !autoPaused && picked === "manual") {
-          setStatus("自动播报中，请先点「暂停」再切换手动。");
-          syncModeRadioSelection();
-          updateModeControlsState();
-          return;
-        }
-
-        try {
-          await api("/api/settings", { method: "POST", body: { mode: picked } });
-        } catch (e) {
-          setStatus(e.message);
-          syncModeRadioSelection();
-          updateModeControlsState();
-          return;
-        }
-
-        if (picked === "auto" && sessionMode !== "auto") {
-          sessionMode = "auto";
-          autoPaused = false;
-          $("btnPause").textContent = "暂停";
-          setStatus("已切换为自动模式。");
-          scheduleAutoNext();
-        } else if (picked === "manual") {
-          sessionMode = "manual";
-          autoPaused = false;
-          clearAutoTimer();
-          $("btnPause").textContent = "暂停";
-          setStatus("已切换为手动模式。");
-        }
-        syncModeRadioSelection();
-        updateModeControlsState();
-      });
-    });
-
-    $("btnGotoImport").addEventListener("click", () => {
-      window.location.href = "/import";
-    });
-
-    $("btnSwitchLibrary").addEventListener("click", () => {
-      setStatus("预置词库（小学/初中/高中/大学/四级/六级）入口已预留，功能即将上线。");
-      alert("词库切换入口已预留，预置词库功能即将上线。");
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.code !== "Space") return;
-      const t = e.target;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT"))
-        return;
-      if (!sessionActive) {
-        e.preventDefault();
-        setStatus("已退出，点击「开始」继续。");
-        return;
-      }
-      e.preventDefault();
-      $("btnNext").click();
-    });
 
     const ONBOARDING_DONE_KEY = "dictation.onboarding.completed";
     const ONBOARDING_VISIT_DAYS_KEY = "dictation.welcome.visitDays";
@@ -773,13 +223,6 @@
       return null;
     }
 
-    function pushView(viewName) {
-      const u = new URL(window.location.href);
-      u.searchParams.set("view", viewName);
-      history.pushState({ view: viewName }, "", u);
-      renderView(viewName);
-    }
-
     function replaceView(viewName) {
       const u = new URL(window.location.href);
       u.searchParams.set("view", viewName);
@@ -831,27 +274,22 @@
       });
 
       $("btnWelcomeEnter").addEventListener("click", () => {
-        if (isFirstTimeUser()) pushView(VIEW_LIBRARY);
-        else pushView(VIEW_APP);
+        if (isFirstTimeUser()) replaceView(VIEW_LIBRARY);
+        else replaceView(VIEW_APP);
       });
-      $("btnSetupBackLibrary").addEventListener("click", () => pushView(VIEW_WELCOME));
-      $("btnSetupNextLibrary").addEventListener("click", () => pushView(VIEW_DICTATION));
-      $("btnSetupBackDictation").addEventListener("click", () => pushView(VIEW_LIBRARY));
+      $("btnSetupBackLibrary").addEventListener("click", () => replaceView(VIEW_WELCOME));
+      $("btnSetupNextLibrary").addEventListener("click", () => replaceView(VIEW_DICTATION));
+      $("btnSetupBackDictation").addEventListener("click", () => replaceView(VIEW_LIBRARY));
       $("btnSetupFinish").addEventListener("click", async () => {
         const firstDm = document.querySelector('input[name="first_dictation_mode"]:checked').value;
         localStorage.setItem(PREF_DM_KEY, firstDm);
         localStorage.setItem(ONBOARDING_DONE_KEY, "1");
-        const dmEl = document.querySelector(`input[name="dictation_mode"][value="${firstDm}"]`);
-        if (dmEl) dmEl.checked = true;
         await api("/api/settings", { method: "POST", body: { dictation_mode: firstDm } }).catch(() => {});
-        pushView(VIEW_APP);
+        replaceView(VIEW_APP);
       });
     }
 
-    loadConfig().catch((e) => setStatus("加载失败：" + e.message));
     initOnboarding();
-    setDictationModeDisabled(false);
-    updateModeControlsState();
   </script>
 </body>
 </html>

@@ -15,6 +15,7 @@ import edge_tts
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORDS_FILE = SCRIPT_DIR / "words.json"
 PROGRESS_FILE = SCRIPT_DIR / "progress.json"
+WRONG_SPELL_BOOK_FILE = SCRIPT_DIR / "wrong_spell_book.json"
 TTS_CACHE_DIR = SCRIPT_DIR / "tts_cache"
 
 EDGE_VOICE_EN = "en-US-AriaNeural"
@@ -146,6 +147,66 @@ def spell_answer_line(word: dict) -> str:
     return en or zh
 
 
+def normalize_spell_text(s: str) -> str:
+    """拼写比对：去首尾空白、折叠空白、英文小写。"""
+    t = str(s or "").strip()
+    t = re.sub(r"\s+", " ", t)
+    return t.casefold()
+
+
+def spell_attempt_matches_word(word: dict, attempt: str) -> bool:
+    en = normalize_spell_text(str(word.get("en", "")).strip())
+    if not en:
+        return False
+    return normalize_spell_text(attempt) == en
+
+
+def append_wrong_spell_entries(
+    rows: list[dict],
+    *,
+    unit: str,
+    lesson: str,
+) -> None:
+    """
+    将错题追加写入 wrong_spell_book.json（供日后「错题回顾」读取）。
+    每项含 en, zh, attempt, ts, unit, lesson。
+    """
+    if not rows:
+        return
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    existing: list = []
+    if WRONG_SPELL_BOOK_FILE.is_file():
+        try:
+            raw = json.loads(WRONG_SPELL_BOOK_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, list):
+                existing = raw
+        except Exception:
+            existing = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        en = str(r.get("en", "")).strip()
+        zh = str(r.get("zh", "")).strip()
+        attempt = str(r.get("attempt", "")).strip()
+        if not en and not attempt:
+            continue
+        existing.append(
+            {
+                "en": en,
+                "zh": zh,
+                "attempt": attempt,
+                "ts": ts,
+                "unit": unit,
+                "lesson": lesson,
+            }
+        )
+    WRONG_SPELL_BOOK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    WRONG_SPELL_BOOK_FILE.write_text(
+        json.dumps(existing, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def spell_hint_segment(word: dict, click_index: int) -> tuple[str, str]:
     """
     电脑拼写模式提示：第 click_index 次点击（从 1 起）在巧记与原文之间交替。
@@ -239,6 +300,39 @@ def get_progress_history(limit: int = 10) -> list[dict]:
     if not isinstance(history, list):
         return []
     return [h for h in history if isinstance(h, dict)][: max(0, int(limit))]
+
+
+def _progress_records_equal(a: dict, b: dict) -> bool:
+    """判断两条进度记录是否视为同一条（用于删除历史后是否更新 last）。"""
+    keys = ("ts", "word_en", "word_zh", "unit", "lesson", "status", "index")
+    for k in keys:
+        if str(a.get(k, "")).strip() != str(b.get(k, "")).strip():
+            return False
+    return True
+
+
+def delete_progress_history_item(history_index: int) -> tuple[bool, str]:
+    """
+    按下标删除 progress.json 中 history 的一条。
+    若删除项与 last 相同，则将 last 更新为剩余历史中最新一条或 None。
+    """
+    if history_index < 0:
+        return False, "history_index 无效"
+    store = _load_progress_store()
+    history = store.get("history") or []
+    if not isinstance(history, list):
+        return False, "无历史记录"
+    if history_index >= len(history):
+        return False, "历史记录不存在"
+    removed = history.pop(history_index)
+    if not isinstance(removed, dict):
+        return False, "历史记录不存在"
+    last = store.get("last")
+    if isinstance(last, dict) and _progress_records_equal(last, removed):
+        store["last"] = history[0] if history else None
+    store["history"] = history
+    _save_progress_store(store)
+    return True, ""
 
 
 def save_last_progress(
