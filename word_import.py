@@ -91,12 +91,36 @@ def _looks_like_pos(s: str) -> bool:
     return False
 
 
+def _strip_batch_hash_prefix(line: str) -> str:
+    """去掉行首可选的 #（用于显式段落头，如 # Unit 1 Lesson 1）。"""
+    s = line.strip()
+    if s.startswith("#"):
+        return s[1:].strip()
+    return s
+
+
+def _resembles_section_header_row(s: str) -> bool:
+    """像「单元/课」标题却未命中解析时，避免当词条写入。"""
+    t = s.strip().lower().replace("，", ",")
+    t = re.sub(r"\s+", " ", t)
+    if not t:
+        return False
+    if re.match(r"^lesson\s*\d+", t, re.I):
+        return True
+    if re.search(r"\bunit\b", t) and "lesson" in t:
+        return True
+    if re.search(r"^第\s*\d+\s*单元", t):
+        return True
+    return False
+
+
 def parse_batch_text(text: str) -> tuple[list[dict[str, str]], list[str]]:
     """
     Return (ok_words, error_lines).
     Supports section headers:
     - unit1 lesson1
     - unit 1 lesson 1
+    - # Unit 1 Lesson 1（# 开头显式段落头）
     - lesson2  (reuse current unit)
     """
     ok: list[dict[str, str]] = []
@@ -105,15 +129,27 @@ def parse_batch_text(text: str) -> tuple[list[dict[str, str]], list[str]]:
     current_lesson = ""
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if not line:
             continue
 
-        unit, lesson = _parse_section_header(line)
+        hash_body = _strip_batch_hash_prefix(line)
+        is_hash_line = line.lstrip().startswith("#")
+
+        unit, lesson = _parse_section_header(hash_body)
+        if not unit and not lesson and hash_body != line:
+            unit, lesson = _parse_section_header(line)
         if unit or lesson:
             if unit:
                 current_unit = unit
             if lesson:
                 current_lesson = lesson
+            continue
+
+        if is_hash_line:
+            # # 开头且非段落头：视为注释行
+            continue
+
+        if _resembles_section_header_row(line) and not parse_line(line):
             continue
 
         w = parse_line(line)
@@ -214,7 +250,12 @@ def _parse_section_header(line: str) -> tuple[str, str]:
     s = line.strip().lower().replace("，", ",")
     s = re.sub(r"\s+", " ", s)
 
-    m = re.match(r"^unit\s*([a-z0-9]+)\s*lesson\s*([a-z0-9]+)$", s, re.I)
+    # unit + 数字 + lesson + 数字（允许中间逗号）
+    m = re.match(
+        r"^unit\s*([a-z0-9]+)\s*[,，]?\s*lesson\s*([a-z0-9]+)$",
+        s,
+        re.I,
+    )
     if m:
         return f"Unit {m.group(1)}", f"Lesson {m.group(2)}"
 

@@ -8,11 +8,22 @@
   const player = $("player");
   const settingsModal = $("settingsModal");
   const summaryModal = $("summaryModal");
+  const libraryModal = $("libraryModal");
 
   let autoTimer = null;
   let sessionMode = "manual";
   let autoPaused = false;
   let sessionActive = false;
+
+  function pageTitleForLibrary(config) {
+    const lid = String((config && config.library_id) || "").trim().toLowerCase();
+    if (lid === "primary") return "小学单词";
+    if (lid === "junior") return "初中单词";
+    if (lid === "senior") return "高中单词";
+    if (lid === "cet4") return "英语四级单词";
+    if (lid === "cet6") return "英语六级单词";
+    return "英语听写";
+  }
 
   function setProgressText(line) {
     progressEl.textContent = line;
@@ -161,7 +172,8 @@
   function syncBodyModalOpen() {
     const sOpen = summaryModal && !summaryModal.classList.contains("hidden");
     const gOpen = settingsModal && !settingsModal.classList.contains("hidden");
-    document.body.classList.toggle("modal-open", !!(sOpen || gOpen));
+    const lOpen = libraryModal && !libraryModal.classList.contains("hidden");
+    document.body.classList.toggle("modal-open", !!(sOpen || gOpen || lOpen));
   }
 
   function openSummaryModal(summary) {
@@ -331,6 +343,9 @@
     const c = await api("/api/config");
     $("lastProgress").textContent = c.last_progress || "";
     $("currentLibraryLabel").textContent = c.current_library_label || "当前词库（words.json）";
+    const title = pageTitleForLibrary(c);
+    if ($("dictationTitle")) $("dictationTitle").textContent = title;
+    document.title = title + " — 英语单词听写";
     const unitSel = $("unit");
     const lessonSel = $("lesson");
     unitSel.innerHTML = "";
@@ -663,9 +678,53 @@
     window.location.href = "/import";
   });
 
-  $("btnSwitchLibrary").addEventListener("click", () => {
-    setStatus("预置词库（小学/初中/高中/大学/四级/六级）入口已预留，功能即将上线。");
-    alert("词库切换入口已预留，预置词库功能即将上线。");
+  function closeLibraryModal() {
+    if (!libraryModal) return;
+    libraryModal.classList.add("hidden");
+    libraryModal.setAttribute("aria-hidden", "true");
+    syncBodyModalOpen();
+  }
+
+  function openLibraryModal(c) {
+    if (!libraryModal || !$("libraryList")) return;
+    const list = $("libraryList");
+    list.innerHTML = "";
+    const cur = c.library_id || "current";
+    (c.libraries || []).forEach((lib) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "library-picker-row" + (lib.id === cur ? " is-current" : "");
+      const extra = lib.exists ? lib.word_count + " 词" : "暂无文件（0 词）";
+      row.textContent = (lib.label || lib.id) + " · " + extra;
+      row.addEventListener("click", async () => {
+        if (lib.id === cur) {
+          setStatus("已是当前词库。");
+          closeLibraryModal();
+          return;
+        }
+        try {
+          await api("/api/library/select", { method: "POST", body: { library_id: lib.id } });
+          closeLibraryModal();
+          await loadConfig();
+          setStatus("已切换为「" + (lib.label || lib.id) + "」。");
+        } catch (e) {
+          setStatus(e.message);
+        }
+      });
+      list.appendChild(row);
+    });
+    libraryModal.classList.remove("hidden");
+    libraryModal.setAttribute("aria-hidden", "false");
+    syncBodyModalOpen();
+  }
+
+  $("btnSwitchLibrary").addEventListener("click", async () => {
+    try {
+      const c = await api("/api/config");
+      openLibraryModal(c);
+    } catch (e) {
+      setStatus(e.message);
+    }
   });
 
   document.addEventListener("keydown", (e) => {
@@ -695,12 +754,18 @@
   $("btnSettingsOpen").addEventListener("click", openSettingsModal);
   $("btnSettingsClose").addEventListener("click", closeSettingsModal);
   $("settingsModalBackdrop").addEventListener("click", closeSettingsModal);
+  if ($("libraryModalBackdrop")) $("libraryModalBackdrop").addEventListener("click", closeLibraryModal);
+  if ($("btnLibraryClose")) $("btnLibraryClose").addEventListener("click", closeLibraryModal);
   $("summaryModalBackdrop").addEventListener("click", closeSummaryModal);
   $("btnSummaryClose").addEventListener("click", closeSummaryModal);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (summaryModal && !summaryModal.classList.contains("hidden")) {
       closeSummaryModal();
+      return;
+    }
+    if (libraryModal && !libraryModal.classList.contains("hidden")) {
+      closeLibraryModal();
       return;
     }
     if (settingsModal && !settingsModal.classList.contains("hidden")) {

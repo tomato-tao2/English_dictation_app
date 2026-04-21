@@ -364,7 +364,7 @@ class DictationApp:
         if word_en or word_zh:
             for i, w in enumerate(self.filtered_words):
                 en_ok = (not word_en) or (str(w.get("en", "")).strip() == word_en)
-                zh_ok = (not word_zh) or (str(w.get("zh", "")).strip() == word_zh)
+                zh_ok = (not word_zh) or dc.word_zh_matches_record(w, word_zh)
                 if en_ok and zh_ok:
                     resolved = i
                     break
@@ -379,59 +379,19 @@ class DictationApp:
 
         self._begin_from_index(resolved)
 
-    @staticmethod
-    def _dedupe_key(entry: dict) -> str:
-        """Duplicate only if same (en + pos + unit + lesson)."""
-        en = str(entry.get("en", "")).strip().lower()
-        pos = str(entry.get("pos", "")).strip().lower()
-        unit = str(entry.get("unit", "")).strip().lower()
-        lesson = str(entry.get("lesson", "")).strip().lower()
-        return f"{en}\t{pos}\t{unit}\t{lesson}"
-
     def _normalize_and_merge(self, raw_list: list[dict]) -> tuple[int, int]:
-        """Merge normalized items; dedupe by (en + pos + unit + lesson)."""
-        seen = {self._dedupe_key(w) for w in self.words}
-        default_unit = self.selected_unit.get()
-        if default_unit == "全部单元":
-            default_unit = "Unit 1"
-        default_lesson = self.selected_lesson.get()
-        if default_lesson == "全部部分":
-            default_lesson = "Lesson 1"
-        added = skipped = 0
-        for item in raw_list:
-            norm = self._normalize_word_entry(item)
-            if not norm:
-                continue
-            if not str(norm.get("unit", "")).strip():
-                norm["unit"] = default_unit
-            if not str(norm.get("lesson", "")).strip():
-                norm["lesson"] = default_lesson
-            key = self._dedupe_key(norm)
-            if key in seen:
-                skipped += 1
-                continue
-            seen.add(key)
-            self.words.append(norm)
-            added += 1
+        """合并导入（与 web 共用 dictation_core：义项合并 + 同形去重）。"""
+        du, dl = dc.default_unit_lesson_for_import(
+            self.selected_unit.get(), self.selected_lesson.get()
+        )
+        self.words, added, skipped = dc.normalize_and_merge(
+            self.words, raw_list, du, dl
+        )
         return added, skipped
 
     @staticmethod
     def _normalize_word_entry(item: dict) -> dict | None:
-        en = str(item.get("en", "")).strip()
-        zh = str(item.get("zh", "")).strip()
-        if not en or not zh:
-            return None
-        out: dict[str, str] = {"en": en, "zh": zh}
-        pos = str(item.get("pos", "")).strip()
-        if pos:
-            out["pos"] = pos
-        unit = str(item.get("unit", "")).strip()
-        lesson = str(item.get("lesson", "")).strip()
-        if unit:
-            out["unit"] = unit
-        if lesson:
-            out["lesson"] = lesson
-        return out
+        return dc.normalize_word_entry(item)
 
     def _chinese_speech_text(self, word: dict) -> str:
         """Speak CN：只读中文义项，不读词性（词性仍保存在词库里供以后检索等用）。"""
@@ -681,14 +641,15 @@ class DictationApp:
         self._update_mode_controls_state()
 
     def _prompt_text_and_language(self, word: dict) -> tuple[str, str]:
-        if self.dictation_mode.get() == "zh_to_en":
-            return self._chinese_speech_text(word), "zh"
-        return str(word.get("en", "")).strip(), "en"
+        dm = self.dictation_mode.get()
+        sense_i = None
+        if dm == "zh_to_en":
+            sense_i = getattr(self, "_zh_sense_seq", 0)
+            self._zh_sense_seq = int(sense_i) + 1
+        return dc.prompt_text_and_language(word, dm, sense_i)
 
     def _hint_text_and_language(self, word: dict) -> tuple[str, str]:
-        if self.dictation_mode.get() == "zh_to_en":
-            return str(word.get("en", "")).strip(), "en"
-        return self._chinese_speech_text(word), "zh"
+        return dc.hint_text_and_language(word, self.dictation_mode.get())
 
     def _speak(self, text, language="en"):
         self.speech_queue.put((text, language))

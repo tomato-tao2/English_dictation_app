@@ -3,12 +3,93 @@
     "unit": "",
     "lesson": "",
     "status": "exited",
-    "ts": "2026-04-07T18:19:20",
-    "index": 7,
-    "word_en": "anniversary",
-    "word_zh": "周年纪念日"
+    "ts": "2026-04-21T20:02:17",
+    "index": 2,
+    "word_en": "Er",
+    "word_zh": "[医] 铒(68号元素)"
   },
   "history": [
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-21T20:02:17",
+      "index": 2,
+      "word_en": "Er",
+      "word_zh": "[医] 铒(68号元素)"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-21T20:01:36",
+      "index": 0,
+      "word_en": "n't",
+      "word_zh": "adv. 不"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-15T11:16:48",
+      "index": 0,
+      "word_en": "might",
+      "word_zh": "n. 力量, 权力\\naux. 可能, 也许"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-15T11:16:40",
+      "index": 0,
+      "word_en": "might",
+      "word_zh": "n. 力量, 权力\\naux. 可能, 也许"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-12T19:39:49",
+      "index": 92,
+      "word_en": "we",
+      "word_zh": "pron. 我们"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-12T19:10:20",
+      "index": 84,
+      "word_en": "with",
+      "word_zh": "prep. 和...在一起, 以, 由于"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-12T16:51:37",
+      "index": 10,
+      "word_en": "convert",
+      "word_zh": "改变信仰者"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-12T16:50:25",
+      "index": 6,
+      "word_en": "diverse",
+      "word_zh": "不同的;多样的"
+    },
+    {
+      "unit": "",
+      "lesson": "",
+      "status": "exited",
+      "ts": "2026-04-12T13:07:31",
+      "index": 6,
+      "word_en": "diverse",
+      "word_zh": "不同的;多样的"
+    },
     {
       "unit": "",
       "lesson": "",
@@ -17,22 +98,6 @@
       "index": 7,
       "word_en": "anniversary",
       "word_zh": "周年纪念日"
-    },
-    {
-      "unit": "",
-      "lesson": "",
-      "status": "exited",
-      "ts": "2026-04-07T18:19:05",
-      "index": 5,
-      "word_en": "union",
-      "word_zh": "协会;工会"
-    },
-    {
-      "unit": "",
-      "lesson": "",
-      "index": 6,
-      "word_en": "diverse",
-      "word_zh": "不同的;多样的"
     }
   ]
 }

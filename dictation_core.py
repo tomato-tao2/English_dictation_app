@@ -14,6 +14,16 @@ import edge_tts
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORDS_FILE = SCRIPT_DIR / "words.json"
+LIBRARIES_DIR = SCRIPT_DIR / "libraries"
+# (library_id, 展示名, libraries 下文件名；None 表示根目录 words.json)
+LIBRARY_ENTRIES: tuple[tuple[str, str, str | None], ...] = (
+    ("current", "当前词库（words.json）", None),
+    ("primary", "小学词汇", "primary.json"),
+    ("junior", "初中词汇", "junior.json"),
+    ("senior", "高中词汇", "senior.json"),
+    ("cet4", "大学英语四级", "cet4.json"),
+    ("cet6", "大学英语六级", "cet6.json"),
+)
 PROGRESS_FILE = SCRIPT_DIR / "progress.json"
 WRONG_SPELL_BOOK_FILE = SCRIPT_DIR / "wrong_spell_book.json"
 TTS_CACHE_DIR = SCRIPT_DIR / "tts_cache"
@@ -49,14 +59,48 @@ def ensure_tts_mp3(text: str, language: str) -> Path:
     return path
 
 
-def load_words_from_disk() -> list[dict]:
-    if not WORDS_FILE.is_file():
+def normalize_library_id(library_id: str | None) -> str:
+    lid = str(library_id or "current").strip().lower()
+    return lid if any(lid == e[0] for e in LIBRARY_ENTRIES) else "current"
+
+
+def is_known_library_id(library_id: str | None) -> bool:
+    lid = str(library_id or "").strip().lower()
+    return any(lid == e[0] for e in LIBRARY_ENTRIES)
+
+
+def library_label_for_id(library_id: str | None) -> str:
+    lid = str(library_id or "current").strip().lower()
+    for sid, label, _ in LIBRARY_ENTRIES:
+        if sid == lid:
+            return label
+    return "当前词库（words.json）"
+
+
+def words_path_for_library_id(library_id: str | None) -> Path:
+    lid = normalize_library_id(library_id)
+    for sid, _label, fname in LIBRARY_ENTRIES:
+        if sid == lid:
+            if fname is None:
+                return WORDS_FILE
+            LIBRARIES_DIR.mkdir(parents=True, exist_ok=True)
+            return LIBRARIES_DIR / fname
+    return WORDS_FILE
+
+
+def load_words_from_path(path: Path) -> list[dict]:
+    if not path.is_file():
         return []
-    with open(WORDS_FILE, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         return []
     return [w for w in data if isinstance(w, dict) and str(w.get("en", "")).strip()]
+
+
+def load_words_from_disk() -> list[dict]:
+    """Tk 端与兼容入口：始终读取根目录 words.json。"""
+    return load_words_from_path(WORDS_FILE)
 
 
 def norm_unit(value: str) -> str:
@@ -119,9 +163,30 @@ def chinese_speech_text(word: dict) -> str:
     return zh.replace(";", "，")
 
 
-def prompt_text_and_language(word: dict, dictation_mode: str) -> tuple[str, str]:
+def word_zh_matches_record(word: dict, word_zh: str) -> bool:
+    """恢复上次听写：progress 里存的 word_zh 与词条匹配（支持多义项）。"""
+    wz = str(word_zh or "").strip()
+    if not wz:
+        return True
+    if str(word.get("zh", "")).strip() == wz:
+        return True
+    if format_all_senses_zh(word) == wz:
+        return True
+    for s in word_senses(word):
+        if str(s.get("zh", "")).strip() == wz:
+            return True
+    return False
+
+
+def prompt_text_and_language(
+    word: dict,
+    dictation_mode: str,
+    sense_index: int | None = None,
+) -> tuple[str, str]:
     if dictation_mode == "zh_to_en":
-        return chinese_speech_text(word), "zh"
+        idx = 0 if sense_index is None else int(sense_index)
+        text = zh_prompt_for_sense(word, idx)
+        return (text, "zh") if text else ("", "zh")
     # en_to_zh、en_spell：均播报英文单词
     return str(word.get("en", "")).strip(), "en"
 
@@ -141,7 +206,7 @@ def word_mnemonic(word: dict) -> str:
 def spell_answer_line(word: dict) -> str:
     """拼写模式「原文」一行：英文 + 中文义项（若有）。"""
     en = str(word.get("en", "")).strip()
-    zh = str(word.get("zh", "")).strip()
+    zh = format_all_senses_zh(word)
     if en and zh:
         return f"{en} ｜ {zh}"
     return en or zh
@@ -207,6 +272,21 @@ def append_wrong_spell_entries(
     )
 
 
+def load_wrong_spell_entries(limit: int = 200) -> list[dict]:
+    """读取错题本（按最新优先）。"""
+    if not WRONG_SPELL_BOOK_FILE.is_file():
+        return []
+    try:
+        raw = json.loads(WRONG_SPELL_BOOK_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(raw, list):
+        return []
+    rows = [r for r in raw if isinstance(r, dict)]
+    rows.reverse()
+    return rows[: max(0, int(limit))]
+
+
 def spell_hint_segment(word: dict, click_index: int) -> tuple[str, str]:
     """
     电脑拼写模式提示：第 click_index 次点击（从 1 起）在巧记与原文之间交替。
@@ -227,6 +307,9 @@ def hint_text_and_language(word: dict, dictation_mode: str) -> tuple[str, str]:
     if dictation_mode == "en_spell":
         # 网页端拼写模式用 spell_hint_segment，此处勿用于 TTS
         return "", "en"
+    z = format_all_senses_zh(word)
+    if z:
+        return z.replace(";", "，"), "zh"
     return chinese_speech_text(word), "zh"
 
 
@@ -356,7 +439,7 @@ def save_last_progress(
         payload["index"] = int(index)
     if word:
         en = str(word.get("en", "")).strip()
-        zh = str(word.get("zh", "")).strip()
+        zh = format_all_senses_zh(word) if en else str(word.get("zh", "")).strip()
         if en:
             payload["word_en"] = en
         if zh:
@@ -372,11 +455,17 @@ def save_last_progress(
     _save_progress_store(store)
 
 
-def save_words_to_disk(words: list[dict]) -> None:
-    WORDS_FILE.write_text(
+def save_words_to_path(path: Path, words: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(words, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def save_words_to_disk(words: list[dict]) -> None:
+    """默认主词库 words.json（main.py / 旧逻辑）。"""
+    save_words_to_path(WORDS_FILE, words)
 
 
 def dedupe_key(entry: dict) -> str:
@@ -388,15 +477,190 @@ def dedupe_key(entry: dict) -> str:
     return f"{en}\t{pos}\t{unit}\t{lesson}"
 
 
-def normalize_word_entry(item: dict) -> dict | None:
-    en = str(item.get("en", "")).strip()
-    zh = str(item.get("zh", "")).strip()
-    if not en or not zh:
-        return None
-    out: dict[str, str] = {"en": en, "zh": zh}
-    pos = str(item.get("pos", "")).strip()
+def lemma_merge_key(entry: dict) -> str:
+    """同一词形 + 单元 + 部分合并义项（忽略词性）；与听写筛选规范化一致。"""
+    en = str(entry.get("en", "")).strip().lower()
+    unit = norm_unit(str(entry.get("unit", "")).strip()).lower()
+    lesson = norm_lesson(str(entry.get("lesson", "")).strip()).lower()
+    return f"{en}\t{unit}\t{lesson}"
+
+
+def _format_senses_line(senses: list[dict]) -> str:
+    parts: list[str] = []
+    for s in senses:
+        if not isinstance(s, dict):
+            continue
+        p = str(s.get("pos", "")).strip()
+        z = str(s.get("zh", "")).strip()
+        if not z:
+            continue
+        parts.append(f"{p}. {z}".strip() if p else z)
+    return " / ".join(parts)
+
+
+def word_senses(word: dict) -> list[dict[str, str]]:
+    """统一取出义项列表；无 senses 时从顶层 pos/zh 构造。"""
+    raw = word.get("senses")
+    out: list[dict[str, str]] = []
+    if isinstance(raw, list):
+        for o in raw:
+            if not isinstance(o, dict):
+                continue
+            zh = str(o.get("zh", "")).strip()
+            if not zh:
+                continue
+            d: dict[str, str] = {"zh": zh}
+            p = str(o.get("pos", "")).strip()
+            if p:
+                d["pos"] = p
+            out.append(d)
+    if out:
+        return out
+    zh = str(word.get("zh", "")).strip()
+    if not zh:
+        return []
+    pos = str(word.get("pos", "")).strip()
+    d2: dict[str, str] = {"zh": zh}
     if pos:
-        out["pos"] = pos
+        d2["pos"] = pos
+    return [d2]
+
+
+def format_all_senses_zh(word: dict) -> str:
+    """拼写答案行、错题本等：展示全部义项。"""
+    line = _format_senses_line(word_senses(word))
+    if line:
+        return line
+    return str(word.get("zh", "")).strip()
+
+
+def _pos_speech_label(pos: str) -> str:
+    p = (pos or "").strip().lower().rstrip(".")
+    if p in ("n", "名词"):
+        return "名词"
+    if p in ("v", "vi", "vt", "动词"):
+        return "动词"
+    if p in ("adj", "形容词"):
+        return "形容词"
+    if p in ("adv", "副词"):
+        return "副词"
+    if p:
+        return f"{p}"
+    return ""
+
+
+def zh_prompt_for_sense(word: dict, sense_index: int) -> str:
+    """中文 → 英文：只播一条义项（含词性前缀），供 TTS。"""
+    senses = word_senses(word)
+    if not senses:
+        return chinese_speech_text(word)
+    idx = max(0, sense_index) % len(senses)
+    s = senses[idx]
+    zh = str(s.get("zh", "")).strip().replace(";", "，")
+    pos = str(s.get("pos", "")).strip()
+    label = _pos_speech_label(pos)
+    if label and zh:
+        return f"{label}：{zh}"
+    return zh
+
+
+def _merge_sense_lists(a: list[dict[str, str]], b: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for s in a + b:
+        zh = str(s.get("zh", "")).strip()
+        if not zh:
+            continue
+        pos = str(s.get("pos", "")).strip().lower()
+        key = f"{pos}\t{zh.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        d: dict[str, str] = {"zh": zh}
+        p = str(s.get("pos", "")).strip()
+        if p:
+            d["pos"] = p
+        out.append(d)
+    return out
+
+
+def _apply_senses_to_entry(entry: dict, senses: list[dict[str, str]]) -> dict:
+    w = dict(entry)
+    w["senses"] = senses
+    w["zh"] = _format_senses_line(senses)
+    if len(senses) == 1:
+        p0 = senses[0].get("pos", "")
+        if p0:
+            w["pos"] = str(p0).strip()
+    else:
+        w.pop("pos", None)
+    return w
+
+
+def coalesce_word_list_by_lemma(words: list[dict]) -> list[dict]:
+    """同一 en+unit+lesson 多条合并为一条（义项写入 senses），保持首次出现顺序。"""
+    order: list[str] = []
+    buckets: dict[str, list[dict]] = {}
+    no_zh_tail: list[dict] = []
+    for w in words:
+        if not isinstance(w, dict):
+            continue
+        en = str(w.get("en", "")).strip()
+        if not en:
+            continue
+        if not word_senses(w):
+            no_zh_tail.append(dict(w))
+            continue
+        lk = lemma_merge_key(w)
+        if lk not in buckets:
+            order.append(lk)
+            buckets[lk] = []
+        buckets[lk].append(w)
+    out: list[dict] = []
+    for lk in order:
+        rows = buckets[lk]
+        base = dict(rows[0])
+        merged_senses: list[dict[str, str]] = []
+        for r in rows:
+            merged_senses = _merge_sense_lists(merged_senses, word_senses(r))
+        out.append(_apply_senses_to_entry(base, merged_senses))
+    return out + no_zh_tail
+
+
+def normalize_word_entry(item: dict) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    en = str(item.get("en", "")).strip()
+    if not en:
+        return None
+    senses_in: list[dict[str, str]] = []
+    raw_s = item.get("senses")
+    if isinstance(raw_s, list):
+        for o in raw_s:
+            if not isinstance(o, dict):
+                continue
+            zh = str(o.get("zh", "")).strip()
+            if not zh:
+                continue
+            d: dict[str, str] = {"zh": zh}
+            p = str(o.get("pos", "")).strip()
+            if p:
+                d["pos"] = p
+            senses_in.append(d)
+    zh = str(item.get("zh", "")).strip()
+    if senses_in:
+        out: dict = {"en": en, "zh": _format_senses_line(senses_in), "senses": senses_in}
+        if len(senses_in) == 1:
+            p0 = senses_in[0].get("pos", "")
+            if p0:
+                out["pos"] = str(p0).strip()
+    else:
+        if not zh:
+            return None
+        out = {"en": en, "zh": zh}
+        pos = str(item.get("pos", "")).strip()
+        if pos:
+            out["pos"] = pos
     unit = str(item.get("unit", "")).strip()
     lesson = str(item.get("lesson", "")).strip()
     if unit:
@@ -412,10 +676,21 @@ def normalize_and_merge(
     default_unit: str,
     default_lesson: str,
 ) -> tuple[list[dict], int, int]:
-    """Merge normalized items; dedupe by (en + pos + unit + lesson). Returns (new_list, added, skipped)."""
-    seen = {dedupe_key(w) for w in words}
-    out = list(words)
+    """
+    合并导入：同一 en+unit+lesson 合并进 senses；仍保留 dedupe_key 防完全重复行。
+    Returns (new_list, added, skipped).
+    """
+    raw_out = [dict(w) for w in words if isinstance(w, dict)]
+    out = coalesce_word_list_by_lemma(raw_out)
+    lemma_index: dict[str, int] = {}
+    for i, w in enumerate(out):
+        if str(w.get("en", "")).strip():
+            lk = lemma_merge_key(w)
+            lemma_index.setdefault(lk, i)
+
+    seen_exact = {dedupe_key(w) for w in out}
     added = skipped = 0
+
     for item in raw_list:
         norm = normalize_word_entry(item)
         if not norm:
@@ -424,18 +699,38 @@ def normalize_and_merge(
             norm["unit"] = default_unit
         if not str(norm.get("lesson", "")).strip():
             norm["lesson"] = default_lesson
-        key = dedupe_key(norm)
-        if key in seen:
+
+        lk = lemma_merge_key(norm)
+        incoming = word_senses(norm)
+
+        if lk in lemma_index:
+            ei = lemma_index[lk]
+            old = out[ei]
+            cur = word_senses(old)
+            merged = _merge_sense_lists(cur, incoming)
+            if _format_senses_line(merged) == _format_senses_line(cur):
+                skipped += 1
+                continue
+            seen_exact.discard(dedupe_key(old))
+            out[ei] = _apply_senses_to_entry(old, merged)
+            seen_exact.add(dedupe_key(out[ei]))
+            continue
+
+        new_w = _apply_senses_to_entry(dict(norm), incoming)
+        dk = dedupe_key(new_w)
+        if dk in seen_exact:
             skipped += 1
             continue
-        seen.add(key)
-        out.append(norm)
+        seen_exact.add(dk)
+        out.append(new_w)
+        lemma_index.setdefault(lk, len(out) - 1)
         added += 1
+
     return out, added, skipped
 
 
 def default_unit_lesson_for_import(selected_unit: str, selected_lesson: str) -> tuple[str, str]:
-    """Match desktop: 全部→Unit 1 / Lesson 1."""
+    """全部单元→Unit 1；全部部分→「全部」（无独立部分的词书）。"""
     u = selected_unit if selected_unit != "全部单元" else "Unit 1"
-    le = selected_lesson if selected_lesson != "全部部分" else "Lesson 1"
+    le = selected_lesson if selected_lesson != "全部部分" else "全部"
     return u, le

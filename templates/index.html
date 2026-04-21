@@ -20,17 +20,8 @@
     <section class="onboarding-step hidden" data-step="library">
       <p class="onboarding-kicker">首次设置 1 / 2</p>
       <h2 class="onboarding-title">先选词库</h2>
-      <p class="onboarding-text">当前先用你的已有词库，后续会加入小学/初中/四级等预置词库。</p>
-      <div class="library-cards">
-        <button type="button" class="library-card active" data-library="current">
-          <strong>当前词库</strong>
-          <span>来自 words.json，可直接开始</span>
-        </button>
-        <button type="button" class="library-card" disabled>
-          <strong>预置词库（敬请期待）</strong>
-          <span>小学 / 初中 / 高中 / 四级 / 六级</span>
-        </button>
-      </div>
+      <p class="onboarding-text">选择本次听写要使用的词库（可在听写页设置里再次切换）。</p>
+      <div class="library-cards" id="onboardingLibraryCards"></div>
       <div class="onboarding-actions">
         <button type="button" class="btn-outline" id="btnSetupBackLibrary">上一步</button>
         <button type="button" id="btnSetupNextLibrary">下一步</button>
@@ -67,6 +58,16 @@
     </header>
 
     <section class="hero-banner" aria-label="欢迎与扩展入口">
+      <button type="button" class="hero-settings-btn" id="btnOnboardingPrefs" title="引导设置" aria-label="引导设置">
+        ⚙
+      </button>
+      <div class="hero-settings-panel hidden" id="onboardingPrefsPanel" role="dialog" aria-label="引导设置">
+        <label class="hero-settings-check">
+          <input type="checkbox" id="chkAlwaysOnboarding" />
+          每次访问都显示引导流程
+        </label>
+        <p class="hero-settings-note">默认关闭。开启后，每次进入首页都会先显示欢迎与设置引导。</p>
+      </div>
       <div class="hero-blobs" aria-hidden="true">
         <span class="hero-blob hero-blob--a"></span>
         <span class="hero-blob hero-blob--b"></span>
@@ -100,15 +101,14 @@
               <strong class="home-feature-name">英语听写</strong>
               <span class="home-feature-desc">按词库范围听写，支持手动 / 自动下一题与拼写模式。若本页进不去，请在地址栏试 <code>/tingxie</code>，或打开 <code>/_debug/who</code> 查看当前服务是否为本项目。</span>
             </a>
-            <button type="button" class="home-feature-card home-feature-card--disabled" disabled title="敬请期待">
+            <a class="home-feature-card home-feature-card--primary" href="/wrong-review">
               <span class="home-feature-kicker">即将开放</span>
-              <strong class="home-feature-name">更多功能</strong>
-              <span class="home-feature-desc">错题回顾、学习统计等将陆续上线</span>
-            </button>
+              <strong class="home-feature-name">错题回顾</strong>
+              <span class="home-feature-desc">复盘拼写模式中写错的单词，查看正确英文、中文以及你当时的输入。</span>
+            </a>
           </div>
           <div class="hero-chips hero-chips--secondary">
             <a class="hero-chip hero-chip--link" href="/import">去录入单词</a>
-            <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">错题回顾</button>
             <button type="button" class="hero-chip hero-chip--soon" title="功能开发中，敬请期待">学习统计</button>
           </div>
         </div>
@@ -140,11 +140,14 @@
 
     const ONBOARDING_DONE_KEY = "dictation.onboarding.completed";
     const ONBOARDING_VISIT_DAYS_KEY = "dictation.welcome.visitDays";
+    const ONBOARDING_ALWAYS_KEY = "dictation.onboarding.always";
     const PREF_DM_KEY = "dictation.pref.dictationMode";
     const VIEW_WELCOME = "welcome";
     const VIEW_LIBRARY = "library";
     const VIEW_DICTATION = "dictation";
     const VIEW_APP = "app";
+    let cachedLibraries = [];
+    let selectedLibraryId = "current";
 
     function localGetJson(key, fallback) {
       try {
@@ -216,6 +219,58 @@
       return localStorage.getItem(ONBOARDING_DONE_KEY) !== "1";
     }
 
+    function isAlwaysShowOnboarding() {
+      return localStorage.getItem(ONBOARDING_ALWAYS_KEY) === "1";
+    }
+
+    function shouldShowOnboarding() {
+      return isFirstTimeUser() || isAlwaysShowOnboarding();
+    }
+
+    function renderLibraryCards() {
+      const wrap = $("onboardingLibraryCards");
+      if (!wrap) return;
+      wrap.innerHTML = "";
+      const libs = cachedLibraries.length
+        ? cachedLibraries
+        : [{ id: "current", label: "当前词库（words.json）", word_count: 0, exists: true }];
+      libs.forEach((lib) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "library-card" + (lib.id === selectedLibraryId ? " active" : "");
+        btn.dataset.library = lib.id;
+        const title = document.createElement("strong");
+        title.textContent = lib.label || lib.id;
+        const sub = document.createElement("span");
+        const cnt = Number.isFinite(lib.word_count) ? lib.word_count : 0;
+        sub.textContent = `${cnt} 词`;
+        btn.appendChild(title);
+        btn.appendChild(sub);
+        btn.addEventListener("click", () => {
+          selectedLibraryId = lib.id;
+          renderLibraryCards();
+        });
+        wrap.appendChild(btn);
+      });
+    }
+
+    async function loadLibraryOptions() {
+      try {
+        const c = await api("/api/config");
+        cachedLibraries = Array.isArray(c.libraries) ? c.libraries : [];
+        selectedLibraryId = c.library_id || "current";
+      } catch (_) {
+        cachedLibraries = [{ id: "current", label: "当前词库（words.json）", word_count: 0, exists: true }];
+        selectedLibraryId = "current";
+      }
+      renderLibraryCards();
+    }
+
+    async function applySelectedLibrary() {
+      if (!selectedLibraryId) return;
+      await api("/api/library/select", { method: "POST", body: { library_id: selectedLibraryId } });
+    }
+
     function currentViewFromUrl() {
       const u = new URL(window.location.href);
       const v = u.searchParams.get("view");
@@ -244,8 +299,8 @@
 
     async function renderView(viewName) {
       const dayCount = touchVisitDay();
-      const firstUser = isFirstTimeUser();
-      if (!firstUser && (viewName === VIEW_LIBRARY || viewName === VIEW_DICTATION)) {
+      const showOnboarding = shouldShowOnboarding();
+      if (!showOnboarding && (viewName === VIEW_WELCOME || viewName === VIEW_LIBRARY || viewName === VIEW_DICTATION)) {
         replaceView(VIEW_APP);
         return;
       }
@@ -258,11 +313,9 @@
     }
 
     function initOnboarding() {
-      const firstUser = isFirstTimeUser();
-      const initialView = currentViewFromUrl() || VIEW_WELCOME;
-      if (initialView === VIEW_LIBRARY && !firstUser) {
-        replaceView(VIEW_APP);
-      } else if (initialView === VIEW_DICTATION && !firstUser) {
+      const showOnboarding = shouldShowOnboarding();
+      const initialView = currentViewFromUrl() || (showOnboarding ? VIEW_WELCOME : VIEW_APP);
+      if (!showOnboarding && (initialView === VIEW_WELCOME || initialView === VIEW_LIBRARY || initialView === VIEW_DICTATION)) {
         replaceView(VIEW_APP);
       } else {
         replaceView(initialView);
@@ -274,11 +327,18 @@
       });
 
       $("btnWelcomeEnter").addEventListener("click", () => {
-        if (isFirstTimeUser()) replaceView(VIEW_LIBRARY);
+        if (shouldShowOnboarding()) replaceView(VIEW_LIBRARY);
         else replaceView(VIEW_APP);
       });
       $("btnSetupBackLibrary").addEventListener("click", () => replaceView(VIEW_WELCOME));
-      $("btnSetupNextLibrary").addEventListener("click", () => replaceView(VIEW_DICTATION));
+      $("btnSetupNextLibrary").addEventListener("click", async () => {
+        try {
+          await applySelectedLibrary();
+          replaceView(VIEW_DICTATION);
+        } catch (e) {
+          alert(`词库切换失败：${e && e.message ? e.message : "未知错误"}`);
+        }
+      });
       $("btnSetupBackDictation").addEventListener("click", () => replaceView(VIEW_LIBRARY));
       $("btnSetupFinish").addEventListener("click", async () => {
         const firstDm = document.querySelector('input[name="first_dictation_mode"]:checked').value;
@@ -287,9 +347,33 @@
         await api("/api/settings", { method: "POST", body: { dictation_mode: firstDm } }).catch(() => {});
         replaceView(VIEW_APP);
       });
+
+      const prefBtn = $("btnOnboardingPrefs");
+      const prefPanel = $("onboardingPrefsPanel");
+      const prefCheck = $("chkAlwaysOnboarding");
+      if (prefCheck) prefCheck.checked = isAlwaysShowOnboarding();
+      if (prefCheck) {
+        prefCheck.addEventListener("change", () => {
+          localStorage.setItem(ONBOARDING_ALWAYS_KEY, prefCheck.checked ? "1" : "0");
+        });
+      }
+      if (prefBtn && prefPanel) {
+        prefBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          prefPanel.classList.toggle("hidden");
+        });
+        document.addEventListener("click", (e) => {
+          if (!prefPanel.classList.contains("hidden")) {
+            const t = e.target;
+            if (t !== prefBtn && !prefPanel.contains(t)) {
+              prefPanel.classList.add("hidden");
+            }
+          }
+        });
+      }
     }
 
-    initOnboarding();
+    loadLibraryOptions().finally(initOnboarding);
   </script>
 </body>
 </html>

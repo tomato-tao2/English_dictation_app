@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>错题回顾</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-dictation">
+  <div class="page-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>错题回顾</h1>
+      </div>
+      <div class="top-links">
+        <a class="link-out" href="{{ url_for('index', view='app') }}">返回主界面</a>
+        {% if show_logout %}
+        <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <section class="hero-banner wrong-review-banner">
+      <div class="wrong-review-table-wrap">
+        {% if rows %}
+        <div class="summary-table-scroll">
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>英文</th>
+                <th>中文</th>
+                <th>你输入的拼写</th>
+                <th>范围</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr>
+                <td>{{ r.ts or "—" }}</td>
+                <td>{{ r.en or "—" }}</td>
+                <td>{{ r.zh or "—" }}</td>
+                <td>{{ r.attempt or "—" }}</td>
+                <td>{{ (r.unit or "全部单元") ~ " / " ~ (r.lesson or "全部部分") }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="muted">暂时还没有错题记录。先去「英语听写」里练一轮拼写模式吧。</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</body>
+</html>

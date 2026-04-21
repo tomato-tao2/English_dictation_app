@@ -99,6 +99,34 @@ def _session_defaults():
     session.setdefault("index", 0)
     session.setdefault("session_active", False)
     session.setdefault("auto_paused", False)
+    session.setdefault("library_id", "current")
+    session["library_id"] = dc.normalize_library_id(session.get("library_id"))
+
+
+def _active_words_path():
+    _session_defaults()
+    return dc.words_path_for_library_id(session.get("library_id"))
+
+
+def _session_load_words() -> list[dict]:
+    return dc.load_words_from_path(_active_words_path())
+
+
+def _session_save_words(words: list[dict]) -> None:
+    dc.save_words_to_path(_active_words_path(), words)
+
+
+def _reset_session_on_library_switch() -> None:
+    session["unit"] = "全部单元"
+    session["lesson"] = "全部部分"
+    session["index"] = 0
+    session["session_active"] = False
+    session["auto_paused"] = False
+    session.pop("spell_last_attempt", None)
+    session.pop("spell_last_correct", None)
+    session.pop("spell_hint_clicks", None)
+    session.pop("zh_sense_seq", None)
+    _clear_spell_session_log()
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -178,19 +206,50 @@ def import_page():
     return render_template("import.html", show_logout=show_logout)
 
 
+@app.route("/wrong-review")
+@login_required
+def wrong_review_page():
+    show_logout = bool(_web_password())
+    rows = dc.load_wrong_spell_entries(300)
+    return render_template("wrong_review.html", show_logout=show_logout, rows=rows)
+
+
 @app.get("/api/config")
 @login_required
 def api_config():
-    words = dc.load_words_from_disk()
+    _session_defaults()
+    active_path = _active_words_path()
+    words = dc.load_words_from_path(active_path)
     unit = session.get("unit", "全部单元")
     lesson = session.get("lesson", "全部部分")
     units = ["全部单元"] + dc.list_units(words)
     lessons = ["全部部分"] + dc.list_lessons(words, unit)
+    lid = session.get("library_id", "current")
+    libraries_meta = []
+    for sid, label, _fname in dc.LIBRARY_ENTRIES:
+        p = dc.words_path_for_library_id(sid)
+        exists = p.is_file()
+        if p == active_path:
+            wc = len(words)
+        elif exists:
+            wc = len(dc.load_words_from_path(p))
+        else:
+            wc = 0
+        libraries_meta.append(
+            {
+                "id": sid,
+                "label": label,
+                "exists": exists,
+                "word_count": wc,
+            }
+        )
     return jsonify(
         {
             "units": units,
             "lessons": lessons,
-            "current_library_label": "当前词库（words.json）",
+            "library_id": lid,
+            "libraries": libraries_meta,
+            "current_library_label": dc.library_label_for_id(lid),
             "unit": unit,
             "lesson": lesson,
             "mode": session.get("mode", "manual"),
@@ -224,7 +283,7 @@ def api_settings():
                 session["interval"] = iv
         except (TypeError, ValueError):
             pass
-    words = dc.load_words_from_disk()
+    words = _session_load_words()
     unit = session.get("unit", "全部单元")
     lesson = session.get("lesson", "全部部分")
     return jsonify(
@@ -234,6 +293,19 @@ def api_settings():
             "word_count": len(dc.scope_filtered_words(words, unit, lesson)),
         }
     )
+
+
+@app.post("/api/library/select")
+@login_required
+def api_library_select():
+    _session_defaults()
+    data = request.get_json(force=True, silent=True) or {}
+    new_id = str(data.get("library_id", "current")).strip().lower()
+    if not dc.is_known_library_id(new_id):
+        return jsonify({"error": "未知词库"}), 400
+    session["library_id"] = new_id
+    _reset_session_on_library_switch()
+    return jsonify({"ok": True, "library_id": new_id})
 
 
 @app.get("/api/audio/<digest>.mp3")
@@ -266,7 +338,7 @@ def api_tts():
 
 
 def _current_filtered():
-    words = dc.load_words_from_disk()
+    words = _session_load_words()
     unit = session.get("unit", "全部单元")
     lesson = session.get("lesson", "全部部分")
     return dc.scope_filtered_words(words, unit, lesson)
@@ -303,7 +375,7 @@ def _finalize_current_spell_row(filtered: list, idx: int) -> None:
     submitted = attempt is not None
     row = {
         "en": str(w.get("en", "")).strip(),
-        "zh": str(w.get("zh", "")).strip(),
+        "zh": dc.format_all_senses_zh(w),
         "hint_count": hints,
         "submitted": submitted,
         "attempt": str(attempt).strip() if submitted else "",
@@ -359,9 +431,17 @@ def _persist_spell_wrongs_and_maybe_append(summary: dict | None) -> None:
     dc.append_wrong_spell_entries(wrong, unit=unit, lesson=lesson)
 
 
+def _next_zh_sense_index() -> int:
+    session.setdefault("zh_sense_seq", 0)
+    v = int(session["zh_sense_seq"])
+    session["zh_sense_seq"] = v + 1
+    return v
+
+
 def _prompt_urls(word: dict) -> list[str]:
     dm = session.get("dictation_mode", "en_to_zh")
-    text, lang = dc.prompt_text_and_language(word, dm)
+    sense_i = _next_zh_sense_index() if dm == "zh_to_en" else None
+    text, lang = dc.prompt_text_and_language(word, dm, sense_i)
     if not text:
         return []
     path = dc.ensure_tts_mp3(text, lang)
@@ -387,7 +467,7 @@ def _resume_payload_from_record(record: dict) -> tuple[dict | None, str | None]:
     if word_en or word_zh:
         for i, w in enumerate(filtered):
             en_ok = (not word_en) or (str(w.get("en", "")).strip() == word_en)
-            zh_ok = (not word_zh) or (str(w.get("zh", "")).strip() == word_zh)
+            zh_ok = (not word_zh) or dc.word_zh_matches_record(w, word_zh)
             if en_ok and zh_ok:
                 resolved = i
                 break
@@ -450,6 +530,7 @@ def api_start():
     session["index"] = 0
     session["session_active"] = True
     session["auto_paused"] = False
+    session["zh_sense_seq"] = 0
     _reset_spell_hint_clicks()
     session.pop("spell_last_attempt", None)
     session.pop("spell_last_correct", None)
@@ -626,7 +707,7 @@ def api_exit():
     session["auto_paused"] = True
 
     word_en = str(word.get("en", "")).strip() if word else ""
-    word_zh = str(word.get("zh", "")).strip() if word else ""
+    word_zh = dc.format_all_senses_zh(word) if word else ""
 
     spell_summary = _take_spell_summary_and_clear_buffer()
     _persist_spell_wrongs_and_maybe_append(spell_summary)
@@ -709,7 +790,7 @@ def api_words_single():
     item: dict[str, str] = {"en": en, "zh": zh}
     if pos:
         item["pos"] = pos
-    words = dc.load_words_from_disk()
+    words = _session_load_words()
     du, dl = dc.default_unit_lesson_for_import(
         session.get("unit", "全部单元"),
         session.get("lesson", "全部部分"),
@@ -724,7 +805,7 @@ def api_words_single():
                 "message": "相同的「英文 + 词性 + 单元 + 部分」已在词库中，未重复添加。",
             }
         )
-    dc.save_words_to_disk(new_words)
+    _session_save_words(new_words)
     return jsonify({"ok": True, "added": added, "skipped": skipped})
 
 
@@ -742,13 +823,13 @@ def api_words_batch():
             items.append(n)
     if bad and not items:
         return jsonify({"error": "没有解析到有效行，请检查格式（例：abandon,v,放弃;抛弃）"}), 400
-    words = dc.load_words_from_disk()
+    words = _session_load_words()
     du, dl = dc.default_unit_lesson_for_import(
         session.get("unit", "全部单元"),
         session.get("lesson", "全部部分"),
     )
     new_words, added, skipped = dc.normalize_and_merge(words, items, du, dl)
-    dc.save_words_to_disk(new_words)
+    _session_save_words(new_words)
     return jsonify(
         {
             "ok": True,
@@ -778,13 +859,13 @@ def api_words_csv():
             norms.append(n)
     if not norms:
         return jsonify({"error": "未解析到有效行，请检查编码为 UTF-8，列是否为 英文+中文。"}), 400
-    words = dc.load_words_from_disk()
+    words = _session_load_words()
     du, dl = dc.default_unit_lesson_for_import(
         session.get("unit", "全部单元"),
         session.get("lesson", "全部部分"),
     )
     new_words, added, skipped = dc.normalize_and_merge(words, norms, du, dl)
-    dc.save_words_to_disk(new_words)
+    _session_save_words(new_words)
     return jsonify(
         {
             "ok": True,

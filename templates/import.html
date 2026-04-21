@@ -24,7 +24,7 @@
 
     <section class="card panel-import import-page-only">
       <h2 class="card-title">录入单词</h2>
-      <p class="import-hint">新词会写入 <code>words.json</code>（与程序同目录）。保存后听写页的计数会自动刷新。</p>
+      <p class="import-hint">新词会写入当前所选词库对应的 JSON（与程序同目录）。保存后听写页的计数会自动刷新。</p>
       <p class="import-hint" id="importScopeHint">默认归入当前听写范围。</p>
       <div class="tabs" role="tablist">
         <button type="button" class="tab active" data-tab="single" role="tab" aria-selected="true">单个添加</button>
@@ -48,7 +48,7 @@
         <button type="button" class="btn-secondary" id="btnSaveSingle">保存到词库</button>
       </div>
       <div id="tab-batch" class="tab-panel hidden" role="tabpanel">
-        <p class="import-hint">每行一条。推荐：<code>英文,词性,中文;义项2</code>（例：<code>convert,v,转变;转换</code>）。也支持在批量里写 <code>unit1lesson1</code>、<code>lesson2</code> 等段落头切换单元/部分。</p>
+        <p class="import-hint">每行一条。推荐：<code>英文,词性,中文;义项2</code>（例：<code>convert,v,转变;转换</code>）。段落头必须使用 <code>Unit</code>（不支持 <code>Unite</code>）。段落头示例：<code>Unit 1 Lesson 1</code>、<code># Unit 1 Lesson 1</code>、<code>unit1lesson1</code>、<code>lesson2</code>（沿用当前单元）。纯注释行可用 <code>#</code> 开头（非段落头整行会忽略）。</p>
         <textarea id="batchText" placeholder="abandon,v,放弃;抛弃"></textarea>
         <p class="import-hint" style="margin-top:8px">也支持「英文,词性.中文」或仅「英文,中文」。</p>
         <button type="button" class="btn-secondary" id="btnSaveBatch">解析并加入词库</button>
