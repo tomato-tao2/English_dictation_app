@@ -1,3 +1,5 @@
 # Linux 云上部署额外依赖（与 requirements.txt 一并安装）
 -r requirements.txt
 gunicorn>=22.0
+# PostgreSQL（阿里云 RDS 等）：设置 DATABASE_URL=postgresql+psycopg://用户:密码@主机:5432/库名
+psycopg[binary]>=3.1

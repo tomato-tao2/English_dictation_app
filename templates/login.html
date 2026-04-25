@@ -7,17 +7,37 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body class="auth">
+  <a class="auth-back-link" href="{{ url_for('index', view='app') }}">← 返回上一页</a>
   <main class="card-login">
     <h1>英语单词听写</h1>
+    {% if legacy_site_only %}
     <p class="muted">请输入访问密码</p>
+    {% else %}
+    <p class="muted">使用账号登录（数据将保存在服务器数据库中）</p>
+    {% endif %}
     {% if error %}
     <p class="error">{{ error }}</p>
     {% endif %}
     <form method="post" action="{{ url_for('login_page') }}">
+      <input type="hidden" name="next" value="{{ next_url or url_for('index', view='app') }}" />
+      {% if site_password_required %}
+      <label class="sr-only" for="site_password">站点密码</label>
+      <input type="password" id="site_password" name="site_password" autocomplete="off" placeholder="站点访问密码（如有）" />
+      {% endif %}
+      {% if not legacy_site_only %}
+      <label class="sr-only" for="account">账号</label>
+      <input type="text" id="account" name="account" autocomplete="username" placeholder="账号（小写英文/数字/下划线）" required />
+      <label class="sr-only" for="user_password">密码</label>
+      <input type="password" id="user_password" name="user_password" autocomplete="current-password" placeholder="密码" required />
+      {% else %}
       <label class="sr-only" for="password">密码</label>
       <input type="password" id="password" name="password" autocomplete="current-password" placeholder="密码" required />
+      {% endif %}
       <button type="submit">进入</button>
     </form>
+    {% if use_user_accounts and not legacy_site_only %}
+    <p class="muted" style="margin-top:1rem;"><a href="{{ url_for('register_page', next=(next_url or url_for('index', view='app'))) }}">没有账号？注册</a></p>
+    {% endif %}
   </main>
 </body>
 </html>

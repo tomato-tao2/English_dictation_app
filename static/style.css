@@ -113,6 +113,8 @@ body.onboarding-open {
 .welcome-splash-actions {
   display: flex;
   justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .welcome-enter-btn {
@@ -132,6 +134,51 @@ body.onboarding-open {
 
 .welcome-splash-actions.welcome-btn-animate .welcome-enter-btn {
   animation: welcomeBtnFade 0.7s ease 0.32s forwards;
+}
+
+.welcome-auth-link {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 26px;
+  border-radius: 12px;
+  border: 2px solid rgba(27, 107, 92, 0.35);
+  color: #1b6b5c;
+  text-decoration: none;
+  font-size: clamp(1rem, 2.1vw, 1.18rem);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 14px rgba(27, 107, 92, 0.18);
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.welcome-splash-actions.welcome-btn-animate .welcome-auth-link {
+  animation: welcomeBtnFade 0.7s ease 0.42s forwards;
+}
+
+.welcome-auth-link::after {
+  content: "";
+  position: absolute;
+  top: -28%;
+  left: -54%;
+  width: 40%;
+  height: 165%;
+  transform: rotate(20deg);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(27, 107, 92, 0.25) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: login-cta-sweep 2.7s ease-in-out infinite;
+}
+
+.welcome-auth-link:hover {
+  color: #0f4d41;
+  border-color: rgba(27, 107, 92, 0.6);
 }
 
 @keyframes welcomeBtnFade {
@@ -260,6 +307,77 @@ body.onboarding-open {
   margin-bottom: 22px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.top-user-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.top-user-name {
+  font-size: 0.9rem;
+  color: var(--muted, #64748b);
+}
+
+.top-login-cta {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 168px;
+  min-height: 52px;
+  padding: 0 24px;
+  border-radius: 14px;
+  text-decoration: none;
+  background: linear-gradient(135deg, #1b6b5c, #2f9583);
+  box-shadow: 0 10px 24px rgba(27, 107, 92, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.top-login-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(27, 107, 92, 0.45);
+}
+
+.top-login-cta__text {
+  position: relative;
+  z-index: 2;
+  color: #ffffff;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.top-login-cta::after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: -52%;
+  width: 42%;
+  height: 170%;
+  transform: rotate(20deg);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: login-cta-sweep 2.6s ease-in-out infinite;
+}
+
+@keyframes login-cta-sweep {
+  0% {
+    left: -58%;
+  }
+  58% {
+    left: 128%;
+  }
+  100% {
+    left: 128%;
+  }
 }
 
 .brand {
@@ -1138,6 +1256,28 @@ body.auth {
   background: var(--bg-page);
 }
 
+.auth-back-link {
+  position: fixed;
+  top: 26px;
+  left: 26px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  font-weight: 600;
+}
+
+.auth-back-link:hover {
+  color: var(--accent);
+}
+
 .card-login {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1157,7 +1297,10 @@ body.auth {
   margin: 0 0 16px;
 }
 
-.card-login input[type="password"] {
+.card-login input[type="password"],
+.card-login input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: 14px;
 }
 

@@ -16,6 +16,11 @@ import edge_tts
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORDS_FILE = SCRIPT_DIR / "words.json"
 LIBRARIES_DIR = SCRIPT_DIR / "libraries"
+
+# Web 多用户：可由 web_app 指向每位用户的进度/错题/个人词库文件（Tk 桌面版不受影响）
+_PROGRESS_PATH_OVERRIDE: Path | None = None
+_WRONG_SPELL_PATH_OVERRIDE: Path | None = None
+_WORDS_FILE_OVERRIDE: Path | None = None
 # (library_id, 展示名, libraries 下文件名；None 表示根目录 words.json)
 LIBRARY_ENTRIES: tuple[tuple[str, str, str | None], ...] = (
     ("current", "当前词库（words.json）", None),
@@ -28,6 +33,35 @@ LIBRARY_ENTRIES: tuple[tuple[str, str, str | None], ...] = (
 PROGRESS_FILE = SCRIPT_DIR / "progress.json"
 WRONG_SPELL_BOOK_FILE = SCRIPT_DIR / "wrong_spell_book.json"
 TTS_CACHE_DIR = SCRIPT_DIR / "tts_cache"
+
+
+def set_web_data_paths(
+    *,
+    progress: Path | None = None,
+    wrong_spell: Path | None = None,
+    words_current: Path | None = None,
+) -> None:
+    """为当前请求/会话绑定数据文件；传 None 表示使用项目根目录默认路径。"""
+    global _PROGRESS_PATH_OVERRIDE, _WRONG_SPELL_PATH_OVERRIDE, _WORDS_FILE_OVERRIDE
+    _PROGRESS_PATH_OVERRIDE = progress
+    _WRONG_SPELL_PATH_OVERRIDE = wrong_spell
+    _WORDS_FILE_OVERRIDE = words_current
+
+
+def clear_web_data_paths() -> None:
+    set_web_data_paths(progress=None, wrong_spell=None, words_current=None)
+
+
+def active_progress_path() -> Path:
+    return _PROGRESS_PATH_OVERRIDE or PROGRESS_FILE
+
+
+def active_wrong_spell_path() -> Path:
+    return _WRONG_SPELL_PATH_OVERRIDE or WRONG_SPELL_BOOK_FILE
+
+
+def active_words_file() -> Path:
+    return _WORDS_FILE_OVERRIDE or WORDS_FILE
 
 WRONG_SOURCE_DICTATION_SPELL = "dictation_spell"
 WRONG_SOURCE_QUIZ = "quiz"
@@ -87,10 +121,10 @@ def words_path_for_library_id(library_id: str | None) -> Path:
     for sid, _label, fname in LIBRARY_ENTRIES:
         if sid == lid:
             if fname is None:
-                return WORDS_FILE
+                return active_words_file()
             LIBRARIES_DIR.mkdir(parents=True, exist_ok=True)
             return LIBRARIES_DIR / fname
-    return WORDS_FILE
+    return active_words_file()
 
 
 def load_words_from_path(path: Path) -> list[dict]:
@@ -246,9 +280,10 @@ def append_wrong_spell_entries(
         return
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     existing: list = []
-    if WRONG_SPELL_BOOK_FILE.is_file():
+    wpath = active_wrong_spell_path()
+    if wpath.is_file():
         try:
-            raw = json.loads(WRONG_SPELL_BOOK_FILE.read_text(encoding="utf-8"))
+            raw = json.loads(wpath.read_text(encoding="utf-8"))
             if isinstance(raw, list):
                 existing = raw
         except Exception:
@@ -274,8 +309,8 @@ def append_wrong_spell_entries(
                 else WRONG_SOURCE_DICTATION_SPELL,
             }
         )
-    WRONG_SPELL_BOOK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    WRONG_SPELL_BOOK_FILE.write_text(
+    wpath.parent.mkdir(parents=True, exist_ok=True)
+    wpath.write_text(
         json.dumps(existing, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -290,10 +325,11 @@ def wrong_entry_source(row: dict) -> str:
 
 def load_wrong_spell_entries(limit: int = 200, *, source: str | None = None) -> list[dict]:
     """读取错题本（按最新优先）；source=None 表示不过滤来源。"""
-    if not WRONG_SPELL_BOOK_FILE.is_file():
+    wpath = active_wrong_spell_path()
+    if not wpath.is_file():
         return []
     try:
-        raw = json.loads(WRONG_SPELL_BOOK_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(wpath.read_text(encoding="utf-8"))
     except Exception:
         return []
     if not isinstance(raw, list):
@@ -434,10 +470,11 @@ def load_last_progress_text() -> str:
 
 def _load_progress_store() -> dict:
     """Return {'last': record|None, 'history': list[record]} with legacy compatibility."""
-    if not PROGRESS_FILE.is_file():
+    pfile = active_progress_path()
+    if not pfile.is_file():
         return {"last": None, "history": []}
     try:
-        raw = json.loads(PROGRESS_FILE.read_text(encoding="utf-8"))
+        raw = json.loads(pfile.read_text(encoding="utf-8"))
     except Exception:
         return {"last": None, "history": []}
 
@@ -455,7 +492,9 @@ def _load_progress_store() -> dict:
 
 
 def _save_progress_store(store: dict) -> None:
-    PROGRESS_FILE.write_text(
+    pfile = active_progress_path()
+    pfile.parent.mkdir(parents=True, exist_ok=True)
+    pfile.write_text(
         json.dumps(store, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )

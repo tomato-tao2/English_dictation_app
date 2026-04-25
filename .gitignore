@@ -1,6 +1,9 @@
 .flask_secret_key
 web_access_password.txt
 
+# 多用户：SQLite 数据库与用户缓存目录
+instance/
+
 .venv/
 __pycache__/
 *.py[cod]

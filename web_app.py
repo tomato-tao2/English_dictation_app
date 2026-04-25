@@ -11,6 +11,7 @@ from functools import wraps
 from flask import (
     Flask,
     abort,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -20,9 +21,18 @@ from flask import (
 )
 
 import dictation_core as dc
+import user_store as us
 from word_import import parse_batch_text, parse_csv_text
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+USE_USER_ACCOUNTS = os.environ.get("USE_USER_ACCOUNTS", "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+if USE_USER_ACCOUNTS:
+    us.init_db()
 
 _DICTATION_MODES = ("en_to_zh", "zh_to_en", "en_spell")
 
@@ -72,6 +82,71 @@ app.secret_key = _app_secret_key()
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 
+def _nav_show_logout() -> bool:
+    return bool(_web_password()) or (
+        USE_USER_ACCOUNTS and session.get("user_id") is not None
+    )
+
+
+def mark_user_study_dirty() -> None:
+    if USE_USER_ACCOUNTS and session.get("user_id"):
+        g.user_study_dirty = True
+
+
+def _flush_study_to_db() -> None:
+    if not USE_USER_ACCOUNTS or not session.get("user_id"):
+        return
+    from sqlalchemy.orm import Session as OrmSession
+
+    with OrmSession(us.get_engine()) as db:
+        us.persist_staging_to_db(db, int(session["user_id"]))
+        db.commit()
+
+
+def _ensure_user_staging_from_db(user_id: int) -> None:
+    from sqlalchemy.orm import Session as OrmSession
+
+    with OrmSession(us.get_engine()) as db:
+        study = db.get(us.UserStudyData, int(user_id))
+        us.write_staging_files(int(user_id), study)
+
+
+@app.context_processor
+def _inject_account_nav():
+    return {
+        "use_user_accounts": USE_USER_ACCOUNTS,
+        "current_username": session.get("user_username"),
+    }
+
+
+@app.before_request
+def _bind_user_data_paths():
+    if not USE_USER_ACCOUNTS:
+        dc.clear_web_data_paths()
+        return
+    uid = session.get("user_id")
+    if not uid:
+        dc.clear_web_data_paths()
+        return
+    staging = us.user_staging_dir(int(uid))
+    staging.mkdir(parents=True, exist_ok=True)
+    if not (staging / "progress.json").is_file():
+        _ensure_user_staging_from_db(int(uid))
+    dc.set_web_data_paths(
+        progress=staging / "progress.json",
+        wrong_spell=staging / "wrong_spell_book.json",
+        words_current=staging / "words.json",
+    )
+
+
+@app.after_request
+def _after_request_persist_user_study(response):
+    if getattr(g, "user_study_dirty", False):
+        _flush_study_to_db()
+        g.user_study_dirty = False
+    return response
+
+
 def _login_required():
     pwd = _web_password()
     if not pwd:
@@ -89,6 +164,14 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return wrapped
+
+
+def _safe_next_url(default: str | None = None) -> str:
+    """仅允许站内相对路径，避免开放跳转。"""
+    target = str(request.values.get("next", "") or "").strip()
+    if target.startswith("/") and not target.startswith("//"):
+        return target
+    return default or url_for("index", view="app")
 
 
 def _session_defaults():
@@ -134,6 +217,58 @@ def _reset_session_on_library_switch() -> None:
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
     pwd_env = _web_password()
+    next_url = _safe_next_url(url_for("index", view="app"))
+
+    if USE_USER_ACCOUNTS:
+        if request.method == "GET" and session.get("user_id") and (
+            not pwd_env or session.get("dictation_ok")
+        ):
+            return redirect(next_url)
+
+        if request.method == "POST":
+            if pwd_env:
+                site_pwd = (request.form.get("site_password") or "").strip()
+                if site_pwd != pwd_env:
+                    return render_template(
+                        "login.html",
+                        error="站点访问密码错误",
+                        site_password_required=bool(pwd_env),
+                        next_url=next_url,
+                    )
+                session["dictation_ok"] = True
+
+            account = (request.form.get("account") or "").strip()
+            user_pwd = request.form.get("user_password") or ""
+            from sqlalchemy.orm import Session as OrmSession
+
+            with OrmSession(us.get_engine()) as db:
+                user = us.verify_user(db, account, user_pwd)
+                if not user:
+                    return render_template(
+                        "login.html",
+                        error="账号或密码错误",
+                        site_password_required=bool(pwd_env),
+                        next_url=next_url,
+                    )
+                study = db.get(us.UserStudyData, user.id)
+                us.write_staging_files(user.id, study)
+                uid = int(user.id)
+                uname = str(user.username)
+
+            session["user_id"] = uid
+            session["user_username"] = uname
+            session.permanent = True
+            if not pwd_env:
+                session["dictation_ok"] = True
+            return redirect(next_url)
+
+        return render_template(
+            "login.html",
+            error=None,
+            site_password_required=bool(pwd_env),
+            next_url=next_url,
+        )
+
     if not pwd_env:
         session["dictation_ok"] = True
         return redirect(url_for("index"))
@@ -143,22 +278,99 @@ def login_page():
         if form_pwd == pwd_env:
             session["dictation_ok"] = True
             session.permanent = True
-            return redirect(url_for("index"))
-        return render_template("login.html", error="密码错误")
+            return redirect(next_url)
+        return render_template(
+            "login.html",
+            error="密码错误",
+            site_password_required=False,
+            legacy_site_only=True,
+            next_url=next_url,
+        )
 
-    return render_template("login.html", error=None)
+    return render_template(
+        "login.html",
+        error=None,
+        site_password_required=False,
+        legacy_site_only=True,
+        next_url=next_url,
+    )
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register_page():
+    if not USE_USER_ACCOUNTS:
+        return redirect(url_for("login_page"))
+    pwd_env = _web_password()
+    next_url = _safe_next_url(url_for("index", view="app"))
+    if request.method == "GET":
+        return render_template(
+            "register.html",
+            error=None,
+            site_password_required=bool(pwd_env),
+            next_url=next_url,
+        )
+
+    if pwd_env:
+        site_pwd = (request.form.get("site_password") or "").strip()
+        if site_pwd != pwd_env:
+            return render_template(
+                "register.html",
+                error="站点访问密码错误",
+                site_password_required=True,
+                next_url=next_url,
+            )
+
+    username = (request.form.get("username") or "").strip()
+    account = (request.form.get("account") or "").strip()
+    password = request.form.get("password") or ""
+    password2 = request.form.get("password2") or ""
+    if password != password2:
+        return render_template(
+            "register.html",
+            error="两次输入的密码不一致",
+            site_password_required=bool(pwd_env),
+            next_url=next_url,
+        )
+    from sqlalchemy.orm import Session as OrmSession
+
+    with OrmSession(us.get_engine()) as db:
+        user, err = us.create_user(db, username, account, password)
+        if not user:
+            return render_template(
+                "register.html",
+                error=err or "注册失败",
+                site_password_required=bool(pwd_env),
+                next_url=next_url,
+            )
+        db.commit()
+        uid = int(user.id)
+        uname = str(user.username)
+        study = db.get(us.UserStudyData, uid)
+        us.write_staging_files(uid, study)
+
+    # 注册成功后直接登录，避免再走一遍登录流程
+    session["user_id"] = uid
+    session["user_username"] = uname
+    session.permanent = True
+    if pwd_env:
+        session["dictation_ok"] = True
+    return redirect(next_url)
 
 
 @app.route("/logout")
 def logout():
+    if USE_USER_ACCOUNTS and session.get("user_id"):
+        _flush_study_to_db()
+    session.pop("user_id", None)
+    session.pop("user_username", None)
     session.pop("dictation_ok", None)
-    return redirect(url_for("login_page"))
+    return redirect(url_for("index", view="app"))
 
 
 @app.route("/")
 @login_required
 def index():
-    show_logout = bool(_web_password())
+    show_logout = _nav_show_logout()
     return render_template("index.html", show_logout=show_logout)
 
 
@@ -169,7 +381,7 @@ def index():
 @login_required
 def dictation_page():
     """英语听写独立页（设置与操作见 templates/dictation.html）。多路径避免个别环境路由异常。"""
-    show_logout = bool(_web_password())
+    show_logout = _nav_show_logout()
     return render_template("dictation.html", show_logout=show_logout)
 
 
@@ -177,7 +389,7 @@ def dictation_page():
 @app.route("/quiz/")
 @login_required
 def quiz_page():
-    show_logout = bool(_web_password())
+    show_logout = _nav_show_logout()
     return render_template("quiz.html", show_logout=show_logout)
 
 
@@ -212,14 +424,14 @@ def debug_who():
 @app.route("/import")
 @login_required
 def import_page():
-    show_logout = bool(_web_password())
+    show_logout = _nav_show_logout()
     return render_template("import.html", show_logout=show_logout)
 
 
 @app.route("/wrong-review")
 @login_required
 def wrong_review_page():
-    show_logout = bool(_web_password())
+    show_logout = _nav_show_logout()
     rows_dictation = dc.load_wrong_spell_entries(
         300, source=dc.WRONG_SOURCE_DICTATION_SPELL
     )
@@ -653,6 +865,7 @@ def api_next():
         session["session_active"] = False
         spell_summary = _take_spell_summary_and_clear_buffer()
         _persist_spell_wrongs_and_maybe_append(spell_summary)
+        mark_user_study_dirty()
         payload = {
             "ok": True,
             "done": True,
@@ -908,6 +1121,7 @@ def api_quiz_exit():
             lesson=str(session.get("lesson", "全部部分")),
             source=dc.WRONG_SOURCE_QUIZ,
         )
+        mark_user_study_dirty()
     _clear_quiz_session()
     return jsonify({"ok": True, "saved_wrong": len(wrong)})
 
@@ -960,6 +1174,7 @@ def api_exit():
 
     spell_summary = _take_spell_summary_and_clear_buffer()
     _persist_spell_wrongs_and_maybe_append(spell_summary)
+    mark_user_study_dirty()
 
     status = "已退出（已记忆当前单词）" if word_en or word_zh else "已退出。"
     out = {
@@ -1023,6 +1238,7 @@ def api_progress_history_delete():
     ok, err = dc.delete_progress_history_item(history_index)
     if not ok:
         return jsonify({"error": err or "删除失败"}), 400
+    mark_user_study_dirty()
     return jsonify({"ok": True})
 
 
@@ -1055,6 +1271,7 @@ def api_words_single():
             }
         )
     _session_save_words(new_words)
+    mark_user_study_dirty()
     return jsonify({"ok": True, "added": added, "skipped": skipped})
 
 
@@ -1079,6 +1296,7 @@ def api_words_batch():
     )
     new_words, added, skipped = dc.normalize_and_merge(words, items, du, dl)
     _session_save_words(new_words)
+    mark_user_study_dirty()
     return jsonify(
         {
             "ok": True,
@@ -1115,6 +1333,7 @@ def api_words_csv():
     )
     new_words, added, skipped = dc.normalize_and_merge(words, norms, du, dl)
     _session_save_words(new_words)
+    mark_user_study_dirty()
     return jsonify(
         {
             "ok": True,

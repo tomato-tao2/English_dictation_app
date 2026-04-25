@@ -14,6 +14,9 @@
       <p class="welcome-splash" id="welcomeSplashText">欢迎你的到来。先用一分钟体验一次听写，马上就能开始。</p>
       <div class="welcome-splash-actions" id="welcomeSplashActions">
         <button type="button" id="btnWelcomeEnter" class="welcome-enter-btn">进入背单词</button>
+        {% if use_user_accounts and not current_username %}
+        <a class="welcome-auth-link" href="{{ url_for('login_page', next=url_for('index', view='app')) }}">登录 / 注册</a>
+        {% endif %}
       </div>
     </section>
 
@@ -52,8 +55,15 @@
         <span class="brand-mark" aria-hidden="true"></span>
         <h1>英语单词听写</h1>
       </div>
-      {% if show_logout %}
-      <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+      {% if use_user_accounts and not current_username %}
+      <a class="top-login-cta" href="{{ url_for('login_page', next=url_for('index', view='app')) }}">
+        <span class="top-login-cta__text">登录 / 注册</span>
+      </a>
+      {% elif show_logout %}
+      <div class="top-user-nav">
+        {% if current_username %}<span class="top-user-name">{{ current_username }}</span>{% endif %}
+        <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+      </div>
       {% endif %}
     </header>
 
@@ -147,6 +157,7 @@
     const ONBOARDING_VISIT_DAYS_KEY = "dictation.welcome.visitDays";
     const ONBOARDING_ALWAYS_KEY = "dictation.onboarding.always";
     const PREF_DM_KEY = "dictation.pref.dictationMode";
+    const IS_LOGGED_IN = {{ "true" if current_username else "false" }};
     const VIEW_WELCOME = "welcome";
     const VIEW_LIBRARY = "library";
     const VIEW_DICTATION = "dictation";
@@ -229,6 +240,7 @@
     }
 
     function shouldShowOnboarding() {
+      if (IS_LOGGED_IN) return false;
       return isFirstTimeUser() || isAlwaysShowOnboarding();
     }
 

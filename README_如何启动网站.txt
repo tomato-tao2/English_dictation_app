@@ -19,3 +19,15 @@
 
 五、不要用错文件
   必须运行 web_app.py。不要运行 main.py（那是桌面窗口版）、dictation_core.py 等。
+
+六、多用户登录与数据库（可选，适合云服务器）
+  默认与以前一样：不设环境变量则无需账号，进度仍写在项目根目录的 progress.json。
+  若要在阿里云等多用户环境使用「注册 / 登录」并把每人进度、错题、个人词库存进数据库：
+    1）安装依赖：pip install -r requirements.txt
+    2）启动前设置环境变量（Windows PowerShell 示例）：
+         $env:USE_USER_ACCOUNTS="1"
+    3）数据库：
+         - 本地默认：自动使用项目下 instance\dictation_users.db（SQLite），无需额外安装数据库软件。
+         - 阿里云 RDS（PostgreSQL）：再安装 requirements-cloud.txt 里的 psycopg，并设置例如
+           DATABASE_URL=postgresql+psycopg://用户名:密码@主机:5432/数据库名
+    4）仍可与「站点访问密码」同时使用：在登录页会先校验 DICTATION_WEB_PASSWORD（若已配置），再校验账号密码。

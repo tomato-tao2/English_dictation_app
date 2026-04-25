@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>听写 — 注册</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="auth">
+  <a class="auth-back-link" href="{{ url_for('index', view='app') }}">← 返回上一页</a>
+  <main class="card-login">
+    <h1>注册账号</h1>
+    {% if registered_ok %}
+    <p class="muted">注册成功。请返回登录。</p>
+    <p><a href="{{ url_for('login_page') }}">去登录</a></p>
+    {% else %}
+    <p class="muted">昵称用于显示；账号用于登录（注册后不可改）。</p>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('register_page') }}">
+      <input type="hidden" name="next" value="{{ next_url or url_for('index', view='app') }}" />
+      {% if site_password_required %}
+      <label class="sr-only" for="site_password">站点密码</label>
+      <input type="password" id="site_password" name="site_password" autocomplete="off" placeholder="站点访问密码" required />
+      {% endif %}
+      <label class="sr-only" for="username">昵称</label>
+      <input type="text" id="username" name="username" maxlength="80" autocomplete="nickname" placeholder="昵称（显示名）" required />
+      <label class="sr-only" for="account">账号</label>
+      <input type="text" id="account" name="account" maxlength="32" autocomplete="username" placeholder="账号 3～32 位（小写英文数字下划线）" required />
+      <label class="sr-only" for="password">密码</label>
+      <input type="password" id="password" name="password" autocomplete="new-password" placeholder="密码（至少 8 位）" required />
+      <label class="sr-only" for="password2">确认密码</label>
+      <input type="password" id="password2" name="password2" autocomplete="new-password" placeholder="再次输入密码" required />
+      <button type="submit">注册</button>
+    </form>
+    <p class="muted" style="margin-top:1rem;"><a href="{{ url_for('login_page', next=(next_url or url_for('index', view='app'))) }}">已有账号？登录</a></p>
+    {% endif %}
+  </main>
+</body>
+</html>
