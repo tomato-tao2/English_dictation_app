@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import random
 import re
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,10 @@ LIBRARY_ENTRIES: tuple[tuple[str, str, str | None], ...] = (
 PROGRESS_FILE = SCRIPT_DIR / "progress.json"
 WRONG_SPELL_BOOK_FILE = SCRIPT_DIR / "wrong_spell_book.json"
 TTS_CACHE_DIR = SCRIPT_DIR / "tts_cache"
+
+WRONG_SOURCE_DICTATION_SPELL = "dictation_spell"
+WRONG_SOURCE_QUIZ = "quiz"
+QUIZ_MODES: tuple[str, ...] = ("en_pick_zh", "en_recall")
 
 EDGE_VOICE_EN = "en-US-AriaNeural"
 EDGE_VOICE_ZH = "zh-CN-XiaoxiaoNeural"
@@ -231,10 +236,11 @@ def append_wrong_spell_entries(
     *,
     unit: str,
     lesson: str,
+    source: str = WRONG_SOURCE_DICTATION_SPELL,
 ) -> None:
     """
     将错题追加写入 wrong_spell_book.json（供日后「错题回顾」读取）。
-    每项含 en, zh, attempt, ts, unit, lesson。
+    每项含 en, zh, attempt, ts, unit, lesson, source。
     """
     if not rows:
         return
@@ -263,6 +269,9 @@ def append_wrong_spell_entries(
                 "ts": ts,
                 "unit": unit,
                 "lesson": lesson,
+                "source": source
+                if source in (WRONG_SOURCE_DICTATION_SPELL, WRONG_SOURCE_QUIZ)
+                else WRONG_SOURCE_DICTATION_SPELL,
             }
         )
     WRONG_SPELL_BOOK_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -272,8 +281,15 @@ def append_wrong_spell_entries(
     )
 
 
-def load_wrong_spell_entries(limit: int = 200) -> list[dict]:
-    """读取错题本（按最新优先）。"""
+def wrong_entry_source(row: dict) -> str:
+    s = str(row.get("source", "")).strip()
+    if s in (WRONG_SOURCE_DICTATION_SPELL, WRONG_SOURCE_QUIZ):
+        return s
+    return WRONG_SOURCE_DICTATION_SPELL
+
+
+def load_wrong_spell_entries(limit: int = 200, *, source: str | None = None) -> list[dict]:
+    """读取错题本（按最新优先）；source=None 表示不过滤来源。"""
     if not WRONG_SPELL_BOOK_FILE.is_file():
         return []
     try:
@@ -284,7 +300,81 @@ def load_wrong_spell_entries(limit: int = 200) -> list[dict]:
         return []
     rows = [r for r in raw if isinstance(r, dict)]
     rows.reverse()
+    if source is not None:
+        rows = [r for r in rows if wrong_entry_source(r) == source]
     return rows[: max(0, int(limit))]
+
+
+def quiz_word_eligible(word: dict) -> bool:
+    en = str(word.get("en", "")).strip()
+    zh = format_all_senses_zh(word)
+    return bool(en and zh)
+
+
+def format_quiz_explanation(word: dict) -> str:
+    en = str(word.get("en", "")).strip()
+    zh = format_all_senses_zh(word)
+    mnemonic = word_mnemonic(word)
+    lines: list[str] = []
+    if en:
+        lines.append(f"英文：{en}")
+    if zh:
+        lines.append(f"中文：{zh}")
+    if mnemonic:
+        lines.append(f"巧记：{mnemonic}")
+    return "\n".join(lines) if lines else "无详细释义"
+
+
+def build_quiz_question(pool: list[dict], word_index: int, mode: str) -> dict:
+    if mode not in QUIZ_MODES:
+        return {"error": "未知抽背模式"}
+    if word_index < 0 or word_index >= len(pool):
+        return {"error": "题目索引无效"}
+    word = pool[word_index]
+    if not quiz_word_eligible(word):
+        return {"error": "当前词条缺少英文或中文"}
+    if mode == "en_recall":
+        return {
+            "kind": "recall",
+            "prompt": str(word.get("en", "")).strip(),
+            "word": word,
+        }
+
+    if len(pool) < 4:
+        return {"error": "选择题至少需要 4 个词"}
+    correct_zh = format_all_senses_zh(word)
+    candidates = [i for i in range(len(pool)) if i != word_index]
+    random.shuffle(candidates)
+    picked = [word]
+    seen = {correct_zh}
+    for i in candidates:
+        w = pool[i]
+        z = format_all_senses_zh(w)
+        if not z or z in seen:
+            continue
+        seen.add(z)
+        picked.append(w)
+        if len(picked) >= 4:
+            break
+    if len(picked) < 4:
+        return {"error": "可用干扰项不足，请扩大范围"}
+    random.shuffle(picked)
+    options = []
+    correct_id = None
+    for idx, w in enumerate(picked):
+        z = format_all_senses_zh(w)
+        options.append({"id": idx, "text": z})
+        if str(w.get("en", "")).strip().casefold() == str(word.get("en", "")).strip().casefold():
+            correct_id = idx
+    if correct_id is None:
+        return {"error": "组题失败"}
+    return {
+        "kind": "choice",
+        "prompt": str(word.get("en", "")).strip(),
+        "options": options,
+        "correct_id": correct_id,
+        "word": word,
+    }
 
 
 def spell_hint_segment(word: dict, click_index: int) -> tuple[str, str]:

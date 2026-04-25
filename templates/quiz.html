@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>抽背练习</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body class="page-dictation page-quiz-app">
+  <div class="page-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="top quiz-top">
+      <div class="top-links">
+        <a class="link-out" href="{{ url_for('index', view='app') }}">返回主界面</a>
+        {% if show_logout %}
+        <a class="link-out" href="{{ url_for('logout') }}">退出</a>
+        {% endif %}
+      </div>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>抽背练习</h1>
+      </div>
+    </header>
+
+    <section class="hero-banner quiz-shell">
+      <div class="quiz-settings-anchor">
+        <button id="btnQuizSettings" class="btn-icon-gear" type="button" title="抽背设置" aria-label="抽背设置">⚙</button>
+      </div>
+      <p id="quizStatus" class="muted">点击“开始”进入抽背。</p>
+      <article class="quiz-stage">
+        <h2 id="quizPrompt" class="quiz-prompt">准备开始</h2>
+        <p id="quizHintLine" class="quiz-phonetic"></p>
+        <div id="quizOptions" class="quiz-options"></div>
+        <div id="quizRecallActions" class="quiz-actions-main hidden">
+          <button type="button" class="quiz-cta quiz-cta--start" id="btnKnown">会</button>
+          <button type="button" class="quiz-cta quiz-cta--exit" id="btnUnknown">不会</button>
+        </div>
+      </article>
+      <pre id="quizExplain" class="quiz-explain-pre hidden"></pre>
+      <div class="quiz-actions-row quiz-actions-row--bottom">
+        <button id="btnQuizStart" class="quiz-cta quiz-cta--start" type="button">开始</button>
+        <button id="btnQuizExit" class="quiz-cta quiz-cta--exit" type="button">退出</button>
+      </div>
+      <div id="quizFinishSummary" class="summary-table-wrap hidden"></div>
+    </section>
+  </div>
+
+  <dialog id="quizSettingsModal" class="quiz-settings-modal">
+    <form method="dialog" class="quiz-settings-card" id="quizSettingsForm">
+      <h3>抽背设置</h3>
+      <div class="settings-grid">
+        <label>
+          模式
+          <select id="quizMode">
+            <option value="en_pick_zh">出英选中（四选一）</option>
+            <option value="en_recall">看英文想中文（会/不会）</option>
+          </select>
+        </label>
+        <label>
+          单元
+          <select id="quizUnit"></select>
+        </label>
+        <label>
+          部分
+          <select id="quizLesson"></select>
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="quiz-settings-btn quiz-settings-btn--cancel" id="btnQuizSettingsCancel">取消</button>
+        <button type="submit" class="quiz-settings-btn quiz-settings-btn--save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="quizWrongModal" class="quiz-wrong-modal">
+    <div class="quiz-wrong-card">
+      <h3 class="quiz-wrong-title">这题答错了</h3>
+      <pre id="quizWrongText" class="quiz-wrong-text"></pre>
+      <div class="settings-actions">
+        <button type="button" class="quiz-settings-btn quiz-settings-btn--save" id="btnQuizWrongNext">下一题</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='quiz.js') }}"></script>
+</body>
+</html>

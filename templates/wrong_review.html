@@ -24,36 +24,71 @@
 
     <section class="hero-banner wrong-review-banner">
       <div class="wrong-review-table-wrap">
-        {% if rows %}
-        <div class="summary-table-scroll">
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>英文</th>
-                <th>中文</th>
-                <th>你输入的拼写</th>
-                <th>范围</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in rows %}
-              <tr>
-                <td>{{ r.ts or "—" }}</td>
-                <td>{{ r.en or "—" }}</td>
-                <td>{{ r.zh or "—" }}</td>
-                <td>{{ r.attempt or "—" }}</td>
-                <td>{{ (r.unit or "全部单元") ~ " / " ~ (r.lesson or "全部部分") }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="wrong-review-tabs" role="tablist" aria-label="错题来源">
+          <button type="button" class="wrong-review-tab active" data-target="panelDictation">听写错题</button>
+          <button type="button" class="wrong-review-tab" data-target="panelQuiz">抽背错题</button>
         </div>
-        {% else %}
-        <p class="muted">暂时还没有错题记录。先去「英语听写」里练一轮拼写模式吧。</p>
-        {% endif %}
+        <div id="panelDictation" class="wrong-review-panel active">
+          {% if rows_dictation %}
+          <div class="summary-table-scroll">
+            <table class="summary-table">
+              <thead>
+                <tr><th>时间</th><th>英文</th><th>中文</th><th>你的作答</th><th>范围</th></tr>
+              </thead>
+              <tbody>
+                {% for r in rows_dictation %}
+                <tr>
+                  <td>{{ r.ts or "—" }}</td>
+                  <td>{{ r.en or "—" }}</td>
+                  <td>{{ r.zh or "—" }}</td>
+                  <td>{{ r.attempt or "—" }}</td>
+                  <td>{{ (r.unit or "全部单元") ~ " / " ~ (r.lesson or "全部部分") }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="muted">暂无听写错题。</p>
+          {% endif %}
+        </div>
+        <div id="panelQuiz" class="wrong-review-panel">
+          {% if rows_quiz %}
+          <div class="summary-table-scroll">
+            <table class="summary-table">
+              <thead>
+                <tr><th>时间</th><th>英文</th><th>中文</th><th>你的作答</th><th>范围</th></tr>
+              </thead>
+              <tbody>
+                {% for r in rows_quiz %}
+                <tr>
+                  <td>{{ r.ts or "—" }}</td>
+                  <td>{{ r.en or "—" }}</td>
+                  <td>{{ r.zh or "—" }}</td>
+                  <td>{{ r.attempt or "—" }}</td>
+                  <td>{{ (r.unit or "全部单元") ~ " / " ~ (r.lesson or "全部部分") }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="muted">暂无抽背错题。</p>
+          {% endif %}
+        </div>
       </div>
     </section>
   </div>
+  <script>
+    const tabs = document.querySelectorAll(".wrong-review-tab");
+    const panels = document.querySelectorAll(".wrong-review-panel");
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        const target = tab.dataset.target;
+        panels.forEach((p) => p.classList.toggle("active", p.id === target));
+      });
+    });
+  </script>
 </body>
 </html>

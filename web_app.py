@@ -28,6 +28,7 @@ _DICTATION_MODES = ("en_to_zh", "zh_to_en", "en_spell")
 
 # 拼写会话逐词统计（仅内存；键为 session 内 spell_log_id，避免大列表进 Cookie）
 SPELL_SESSION_BUFFERS: dict[str, list] = {}
+QUIZ_SESSION_BUFFERS: dict[str, dict] = {}
 
 
 def _app_secret_key() -> str:
@@ -126,6 +127,7 @@ def _reset_session_on_library_switch() -> None:
     session.pop("spell_last_correct", None)
     session.pop("spell_hint_clicks", None)
     session.pop("zh_sense_seq", None)
+    _clear_quiz_session()
     _clear_spell_session_log()
 
 
@@ -171,6 +173,14 @@ def dictation_page():
     return render_template("dictation.html", show_logout=show_logout)
 
 
+@app.route("/quiz")
+@app.route("/quiz/")
+@login_required
+def quiz_page():
+    show_logout = bool(_web_password())
+    return render_template("quiz.html", show_logout=show_logout)
+
+
 @app.get("/_debug/who")
 def debug_who():
     """本机自查：当前进程是否为本项目、是否注册听写路由（勿在生产环境暴露公网）。"""
@@ -210,8 +220,16 @@ def import_page():
 @login_required
 def wrong_review_page():
     show_logout = bool(_web_password())
-    rows = dc.load_wrong_spell_entries(300)
-    return render_template("wrong_review.html", show_logout=show_logout, rows=rows)
+    rows_dictation = dc.load_wrong_spell_entries(
+        300, source=dc.WRONG_SOURCE_DICTATION_SPELL
+    )
+    rows_quiz = dc.load_wrong_spell_entries(300, source=dc.WRONG_SOURCE_QUIZ)
+    return render_template(
+        "wrong_review.html",
+        show_logout=show_logout,
+        rows_dictation=rows_dictation,
+        rows_quiz=rows_quiz,
+    )
 
 
 @app.get("/api/config")
@@ -428,7 +446,71 @@ def _persist_spell_wrongs_and_maybe_append(summary: dict | None) -> None:
         return
     unit = str(session.get("unit", "全部单元") or "全部单元")
     lesson = str(session.get("lesson", "全部部分") or "全部部分")
-    dc.append_wrong_spell_entries(wrong, unit=unit, lesson=lesson)
+    dc.append_wrong_spell_entries(
+        wrong,
+        unit=unit,
+        lesson=lesson,
+        source=dc.WRONG_SOURCE_DICTATION_SPELL,
+    )
+
+
+def _clear_quiz_session() -> None:
+    qid = session.pop("quiz_session_id", None)
+    if qid:
+        QUIZ_SESSION_BUFFERS.pop(qid, None)
+    session["quiz_active"] = False
+    session.pop("quiz_mode", None)
+
+
+def _init_quiz_session(pool: list[dict], mode: str) -> None:
+    qid = secrets.token_hex(8)
+    QUIZ_SESSION_BUFFERS[qid] = {
+        "pool": pool,
+        "mode": mode,
+        "order": list(range(len(pool))),
+        "cursor": 0,
+        "wrong_rows": [],
+        "unknown_rows": [],
+    }
+    session["quiz_session_id"] = qid
+    session["quiz_active"] = True
+    session["quiz_mode"] = mode
+
+
+def _quiz_question_payload(state: dict) -> dict:
+    order = state.get("order") or []
+    cursor = int(state.get("cursor", 0))
+    if cursor >= len(order):
+        wrong_rows = list(state.get("wrong_rows") or [])
+        unknown_rows = list(state.get("unknown_rows") or [])
+        return {
+            "ok": True,
+            "done": True,
+            "status": "本轮完成。",
+            "wrong_rows": wrong_rows,
+            "unknown_rows": unknown_rows,
+        }
+    idx = int(order[cursor])
+    q = dc.build_quiz_question(
+        state.get("pool") or [],
+        idx,
+        str(state.get("mode") or "en_pick_zh"),
+    )
+    if "error" in q:
+        return {"error": q["error"]}
+    state["current"] = q
+    payload = {
+        "ok": True,
+        "done": False,
+        "index": cursor + 1,
+        "total": len(order),
+        "prompt": q.get("prompt", ""),
+        "kind": q.get("kind", "choice"),
+        "quiz_mode": state.get("mode", "en_pick_zh"),
+    }
+    if q.get("kind") == "choice":
+        payload["options"] = q.get("options") or []
+    return payload
 
 
 def _next_zh_sense_index() -> int:
@@ -661,6 +743,173 @@ def api_spell_submit():
     session["spell_last_attempt"] = text
     session["spell_last_correct"] = ok
     return jsonify({"ok": True, "recorded": True})
+
+
+@app.get("/api/quiz/config")
+@login_required
+def api_quiz_config():
+    _session_defaults()
+    words = _session_load_words()
+    unit = session.get("unit", "全部单元")
+    lesson = session.get("lesson", "全部部分")
+    scoped = dc.scope_filtered_words(words, unit, lesson)
+    eligible = sum(1 for w in scoped if dc.quiz_word_eligible(w))
+    return jsonify(
+        {
+            "unit": unit,
+            "lesson": lesson,
+            "units": ["全部单元"] + dc.list_units(words),
+            "lessons": ["全部部分"] + dc.list_lessons(words, unit),
+            "quiz_mode": session.get("quiz_mode", "en_pick_zh"),
+            "word_count": eligible,
+            "mode_options": list(dc.QUIZ_MODES),
+        }
+    )
+
+
+@app.post("/api/quiz/settings")
+@login_required
+def api_quiz_settings():
+    _session_defaults()
+    data = request.get_json(force=True, silent=True) or {}
+    if "unit" in data:
+        session["unit"] = str(data["unit"])
+    if "lesson" in data:
+        session["lesson"] = str(data["lesson"])
+    if "quiz_mode" in data and str(data["quiz_mode"]) in dc.QUIZ_MODES:
+        session["quiz_mode"] = str(data["quiz_mode"])
+    words = _session_load_words()
+    unit = session.get("unit", "全部单元")
+    lesson = session.get("lesson", "全部部分")
+    scoped = dc.scope_filtered_words(words, unit, lesson)
+    eligible = sum(1 for w in scoped if dc.quiz_word_eligible(w))
+    return jsonify(
+        {
+            "ok": True,
+            "lessons": ["全部部分"] + dc.list_lessons(words, unit),
+            "word_count": eligible,
+        }
+    )
+
+
+@app.post("/api/quiz/start")
+@login_required
+def api_quiz_start():
+    _session_defaults()
+    data = request.get_json(force=True, silent=True) or {}
+    if "unit" in data:
+        session["unit"] = str(data["unit"])
+    if "lesson" in data:
+        session["lesson"] = str(data["lesson"])
+    if "quiz_mode" in data and str(data["quiz_mode"]) in dc.QUIZ_MODES:
+        session["quiz_mode"] = str(data["quiz_mode"])
+    mode = str(session.get("quiz_mode", "en_pick_zh"))
+    words = _session_load_words()
+    scoped = dc.scope_filtered_words(
+        words, session.get("unit", "全部单元"), session.get("lesson", "全部部分")
+    )
+    pool = [w for w in scoped if dc.quiz_word_eligible(w)]
+    need_n = 1 if mode == "en_recall" else 4
+    if len(pool) < need_n:
+        return jsonify({"error": f"当前范围可抽背单词不足 {need_n} 个"}), 400
+    _clear_quiz_session()
+    _init_quiz_session(pool, mode)
+    state = QUIZ_SESSION_BUFFERS.get(session.get("quiz_session_id", ""), {})
+    payload = _quiz_question_payload(state)
+    if "error" in payload:
+        return jsonify(payload), 400
+    return jsonify(payload)
+
+
+@app.post("/api/quiz/next")
+@login_required
+def api_quiz_next():
+    if not session.get("quiz_active"):
+        return jsonify({"error": "请先开始抽背"}), 400
+    qid = session.get("quiz_session_id", "")
+    state = QUIZ_SESSION_BUFFERS.get(qid)
+    if not state:
+        return jsonify({"error": "抽背会话已失效，请重新开始"}), 400
+    payload = _quiz_question_payload(state)
+    if "error" in payload:
+        return jsonify(payload), 400
+    return jsonify(payload)
+
+
+@app.post("/api/quiz/submit")
+@login_required
+def api_quiz_submit():
+    if not session.get("quiz_active"):
+        return jsonify({"error": "请先开始抽背"}), 400
+    qid = session.get("quiz_session_id", "")
+    state = QUIZ_SESSION_BUFFERS.get(qid)
+    if not state:
+        return jsonify({"error": "抽背会话已失效，请重新开始"}), 400
+    current = state.get("current") or {}
+    if not current:
+        return jsonify({"error": "当前无题目，请先请求下一题"}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    kind = current.get("kind", "choice")
+    word = current.get("word") or {}
+    is_correct = True
+    if kind == "choice":
+        try:
+            choice_id = int(data.get("option_id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "请选择选项"}), 400
+        correct_id = int(current.get("correct_id", -1))
+        is_correct = choice_id == correct_id
+        if not is_correct:
+            picked = next(
+                (o.get("text", "") for o in (current.get("options") or []) if int(o.get("id", -1)) == choice_id),
+                "",
+            )
+            state.setdefault("wrong_rows", []).append(
+                {
+                    "en": str(word.get("en", "")).strip(),
+                    "zh": dc.format_all_senses_zh(word),
+                    "attempt": str(picked).strip(),
+                }
+            )
+    else:
+        known = str(data.get("known", "")).strip().lower()
+        if known not in ("yes", "no"):
+            return jsonify({"error": "请先选择会/不会"}), 400
+        is_correct = known == "yes"
+        if not is_correct:
+            state.setdefault("unknown_rows", []).append(
+                {
+                    "en": str(word.get("en", "")).strip(),
+                    "zh": dc.format_all_senses_zh(word),
+                    "attempt": "不会",
+                }
+            )
+    state["cursor"] = int(state.get("cursor", 0)) + 1
+    payload = {
+        "ok": True,
+        "correct": is_correct,
+        "explanation": dc.format_quiz_explanation(word),
+    }
+    if kind == "choice":
+        payload["correct_id"] = int(current.get("correct_id", -1))
+    return jsonify(payload)
+
+
+@app.post("/api/quiz/exit")
+@login_required
+def api_quiz_exit():
+    qid = session.get("quiz_session_id", "")
+    state = QUIZ_SESSION_BUFFERS.get(qid) or {}
+    wrong = list(state.get("wrong_rows") or []) + list(state.get("unknown_rows") or [])
+    if wrong:
+        dc.append_wrong_spell_entries(
+            wrong,
+            unit=str(session.get("unit", "全部单元")),
+            lesson=str(session.get("lesson", "全部部分")),
+            source=dc.WRONG_SOURCE_QUIZ,
+        )
+    _clear_quiz_session()
+    return jsonify({"ok": True, "saved_wrong": len(wrong)})
 
 
 @app.post("/api/test-voice")
