@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -85,7 +86,21 @@ def get_engine():
 
 
 def init_db() -> None:
-    Base.metadata.create_all(get_engine())
+    """建表。SQLite + 多 Gunicorn worker 时，并发 `create_all` 会竞态并触发 table already exists，故非 Windows 用文件锁串行化 DDL。"""
+    eng = get_engine()
+    if eng.dialect.name != "sqlite" or sys.platform == "win32":
+        Base.metadata.create_all(eng, checkfirst=True)
+        return
+    os.makedirs(_INSTANCE_DIR, exist_ok=True)
+    lock_path = os.path.join(_INSTANCE_DIR, ".init_db.lock")
+    import fcntl
+
+    with open(lock_path, "a+b") as lock_fp:
+        fcntl.flock(lock_fp, fcntl.LOCK_EX)
+        try:
+            Base.metadata.create_all(get_engine(), checkfirst=True)
+        finally:
+            fcntl.flock(lock_fp, fcntl.LOCK_UN)
 
 
 def _norm_account(s: str) -> str:
