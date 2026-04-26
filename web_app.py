@@ -174,6 +174,26 @@ def _safe_next_url(default: str | None = None) -> str:
     return default or url_for("index", view="app")
 
 
+def _import_requires_account() -> bool:
+    """已开启多用户时，录入单词需登录（写入个人词库）。"""
+    return bool(USE_USER_ACCOUNTS) and not session.get("user_id")
+
+
+def _word_import_account_denied() -> tuple | None:  # returns (Response, status) or None
+    """未登录调录入相关 API 时返回 JSON 错误。"""
+    if not _import_requires_account():
+        return None
+    return (
+        jsonify(
+            {
+                "error": "请先登录/注册再使用录入单词功能。",
+                "code": "account_required",
+            }
+        ),
+        403,
+    )
+
+
 def _session_defaults():
     session.setdefault("unit", "全部单元")
     session.setdefault("lesson", "全部部分")
@@ -425,6 +445,13 @@ def debug_who():
 @login_required
 def import_page():
     show_logout = _nav_show_logout()
+    if _import_requires_account():
+        login_with_next = url_for("login_page", next="/import")
+        return render_template(
+            "import_login_gate.html",
+            show_logout=show_logout,
+            login_with_next_url=login_with_next,
+        )
     return render_template("import.html", show_logout=show_logout)
 
 
@@ -1245,6 +1272,9 @@ def api_progress_history_delete():
 @app.post("/api/words/single")
 @login_required
 def api_words_single():
+    denied = _word_import_account_denied()
+    if denied is not None:
+        return denied
     _session_defaults()
     data = request.get_json(force=True, silent=True) or {}
     en = str(data.get("en", "")).strip()
@@ -1278,6 +1308,9 @@ def api_words_single():
 @app.post("/api/words/batch")
 @login_required
 def api_words_batch():
+    denied = _word_import_account_denied()
+    if denied is not None:
+        return denied
     _session_defaults()
     data = request.get_json(force=True, silent=True) or {}
     text = str(data.get("text", ""))
@@ -1310,6 +1343,9 @@ def api_words_batch():
 @app.post("/api/words/csv")
 @login_required
 def api_words_csv():
+    denied = _word_import_account_denied()
+    if denied is not None:
+        return denied
     _session_defaults()
     f = request.files.get("file")
     if not f or not f.filename:

@@ -1052,6 +1052,76 @@ textarea:focus {
   min-height: calc(100vh - 190px);
 }
 
+/* 未登录访问录入页时的提示（类弹窗） */
+body.import-gate-page {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--bg-page);
+}
+
+.import-gate-overlay {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 80px;
+  box-sizing: border-box;
+}
+
+.import-gate-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 26px 26px;
+  text-align: center;
+}
+
+.import-gate-title {
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+
+.import-gate-text {
+  margin: 0 0 10px;
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.import-gate-hint {
+  margin: 0 0 28px;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.import-gate-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1b6b5c, #2f9583);
+  box-shadow: 0 8px 20px rgba(27, 107, 92, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.import-gate-cta:hover {
+  filter: brightness(1.05);
+}
+
 .history-panel {
   margin-top: 8px;
   border: 1px dashed var(--border);
