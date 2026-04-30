@@ -98,6 +98,21 @@
       <div class="summary-modal-body">
         <p class="summary-intro" id="summaryIntro"></p>
         <p class="meta muted summary-note" id="summaryNote"></p>
+        <div id="summaryCorrectWrap" class="summary-table-wrap">
+          <h3 class="summary-section-title">拼写正确</h3>
+          <div class="summary-table-scroll">
+            <table class="summary-table" id="summaryCorrectTable">
+              <thead>
+                <tr>
+                  <th>正确英文</th>
+                  <th>正确中文</th>
+                  <th>你的拼写</th>
+                </tr>
+              </thead>
+              <tbody id="summaryCorrectTbody"></tbody>
+            </table>
+          </div>
+        </div>
         <div id="summaryWrongWrap" class="summary-table-wrap">
           <h3 class="summary-section-title">拼写错误</h3>
           <div class="summary-table-scroll">
@@ -167,9 +182,7 @@
         </div>
         <div class="row">
           <label>听写方式</label>
-          <label><input type="radio" name="dictation_mode" value="en_to_zh" checked /> 英文 → 写中文</label>
-          <label><input type="radio" name="dictation_mode" value="zh_to_en" /> 中文 → 写英文</label>
-          <label><input type="radio" name="dictation_mode" value="en_spell" /> 听英文 · 电脑拼写</label>
+          <span class="meta">听英文 · 电脑拼写（固定启用）</span>
         </div>
         <div class="row grid-3">
           <div>

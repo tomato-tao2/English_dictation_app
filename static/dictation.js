@@ -14,6 +14,8 @@
   let sessionMode = "manual";
   let autoPaused = false;
   let sessionActive = false;
+  let spellSubmitting = false;
+  let playToken = 0;
 
   function pageTitleForLibrary(config) {
     const lid = String((config && config.library_id) || "").trim().toLowerCase();
@@ -56,8 +58,7 @@
   }
 
   function currentDictationMode() {
-    const el = document.querySelector('input[name="dictation_mode"]:checked');
-    return el ? el.value : "en_to_zh";
+    return "en_spell";
   }
 
   function clearSpellWordState() {
@@ -76,17 +77,7 @@
     if (dm !== "en_spell") clearSpellWordState();
   }
 
-  document.querySelectorAll('input[name="dictation_mode"]').forEach((el) => {
-    el.addEventListener("change", async () => {
-      updateSpellUi();
-      const v = el.value;
-      try {
-        await api("/api/settings", { method: "POST", body: { dictation_mode: v } });
-      } catch (err) {
-        setStatus(err.message);
-      }
-    });
-  });
+  // 听写方式已固定为 en_spell，不再提供切换事件。
 
   function syncModeRadioSelection() {
     const selected = document.querySelector(`input[name="mode"][value="${sessionMode}"]`);
@@ -123,7 +114,21 @@
     }
   }
 
+  function stopCurrentPlayback() {
+    playToken += 1;
+    try {
+      player.pause();
+    } catch (_) {}
+    player.onerror = null;
+    player.onended = null;
+    try {
+      player.removeAttribute("src");
+      player.load();
+    } catch (_) {}
+  }
+
   function playUrls(urls, onDone) {
+    const token = ++playToken;
     if (!urls || !urls.length) {
       if (onDone) onDone();
       return;
@@ -134,6 +139,7 @@
       player.onended = null;
     }
     function finish() {
+      if (token !== playToken) return;
       cleanup();
       if (onDone) onDone();
     }
@@ -144,22 +150,39 @@
       }
       const url = urls[i];
       i += 1;
+      if (token !== playToken) return;
+      let retried = false;
       player.onerror = function () {
+        if (token !== playToken) return;
+        if (!retried) {
+          retried = true;
+          player.src = url + (url.includes("?") ? "&" : "?") + "retry=" + Date.now();
+          try {
+            player.load();
+          } catch (_) {}
+          const p2 = player.play();
+          if (p2 && typeof p2.then === "function") {
+            p2.catch(() => {});
+          }
+          return;
+        }
         setStatus("无法播放音频：片段加载失败，已跳过。");
         cleanup();
         playStep();
       };
       player.onended = function () {
+        if (token !== playToken) return;
         cleanup();
         playStep();
       };
-      player.src = url;
+      player.src = url + (url.includes("?") ? "&" : "?") + "ts=" + Date.now();
       try {
         player.load();
       } catch (_) {}
       const p = player.play();
       if (p && typeof p.then === "function") {
         p.catch(function (e) {
+          if (token !== playToken) return;
           setStatus("无法播放音频：" + (e && e.message ? e.message : "播放失败"));
           cleanup();
           playStep();
@@ -180,6 +203,7 @@
     const st = summary.stats || {};
     const answered = st.answered || 0;
     const correct = st.correct || 0;
+    const correctRows = summary.correct_rows || [];
     const wrongRows = summary.wrong_rows || [];
     const unsubmittedRows = summary.unsubmitted_rows || [];
     const hintRows = summary.hint_rows || [];
@@ -197,6 +221,27 @@
     $("summaryNote").textContent =
       (unanswer > 0 ? "有 " + unanswer + " 题未点「确认」，已列入下方「未点击确认」表。" : "") +
       "未点击确认的词未计入正确率。拼写错误的题已写入错题本，之后可在「错题回顾」中查看（功能入口预留中）。";
+
+    const cWrap = $("summaryCorrectWrap");
+    const cBody = $("summaryCorrectTbody");
+    cBody.innerHTML = "";
+    if (correctRows.length === 0) {
+      cWrap.classList.add("hidden");
+    } else {
+      cWrap.classList.remove("hidden");
+      correctRows.forEach(function (r) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" +
+          escapeHtml(r.en || "") +
+          "</td><td>" +
+          escapeHtml(r.zh || "") +
+          "</td><td>" +
+          escapeHtml(r.attempt || r.en || "") +
+          "</td>";
+        cBody.appendChild(tr);
+      });
+    }
 
     const wWrap = $("summaryWrongWrap");
     const wBody = $("summaryWrongTbody");
@@ -297,14 +342,15 @@
     return false;
   }
 
-  async function postNextAndHandle() {
+  async function postNextAndHandle(forceNext = false) {
     clearAutoTimer();
+    stopCurrentPlayback();
     if (!sessionActive) {
       setStatus("已退出，点击「开始」继续。");
       return;
     }
     try {
-      const d = await api("/api/next", { method: "POST" });
+      const d = await api("/api/next", { method: "POST", body: { force: !!forceNext } });
       const finished = await handleNextResponse(d);
       if (finished) return;
       playUrls(d.audio_urls, function () {
@@ -326,10 +372,9 @@
       if (!sessionActive) return;
       if (autoPaused || sessionMode !== "auto") return;
       try {
-        const d = await api("/api/next", { method: "POST" });
-        const finished = await handleNextResponse(d);
-        if (finished) return;
-        playUrls(d.audio_urls, function () {
+        // 拼写模式下，自动模式只做周期重播，不自动推进到下一题。
+        const rp = await api("/api/replay", { method: "POST" });
+        playUrls(rp.audio_urls, function () {
           if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
           if (currentDictationMode() === "en_spell") $("spellInput").focus();
         });
@@ -470,7 +515,7 @@
       unit: $("unit").value,
       lesson: $("lesson").value,
       mode: document.querySelector('input[name="mode"]:checked').value,
-      dictation_mode: document.querySelector('input[name="dictation_mode"]:checked').value,
+      dictation_mode: currentDictationMode(),
       interval: parseInt($("interval").value, 10) || 10,
     };
   }
@@ -501,6 +546,7 @@
 
   $("btnStart").addEventListener("click", async () => {
     clearAutoTimer();
+    stopCurrentPlayback();
     const s = readSettings();
     sessionMode = s.mode;
     autoPaused = false;
@@ -527,10 +573,16 @@
   });
 
   $("btnNext").addEventListener("click", function () {
-    postNextAndHandle();
+    // 暂停态下手动切题：恢复到可暂停态，避免按钮文案与行为错位。
+    if (sessionMode === "auto" && autoPaused) {
+      autoPaused = false;
+      $("btnPause").textContent = "暂停";
+    }
+    postNextAndHandle(true);
   });
 
   $("btnReplay").addEventListener("click", async () => {
+    stopCurrentPlayback();
     try {
       const d = await api("/api/replay", { method: "POST" });
       setStatus(d.status);
@@ -546,7 +598,8 @@
       const d = await api("/api/hint", { method: "POST" });
       if (dm === "en_spell" && d.hint_text != null && d.hint_text !== "") {
         const kind = d.hint_kind || "";
-        $("spellHintLabel").textContent = kind === "answer" ? "原文" : "巧记";
+        $("spellHintLabel").textContent =
+          kind === "answer" ? "原文" : kind === "spelling" ? "拼读" : "巧记";
         $("spellHintText").textContent = d.hint_text;
         $("spellHintBox").classList.remove("hidden");
         return;
@@ -564,8 +617,9 @@
       $("btnPause").textContent = d.paused ? "继续" : "暂停";
       if (d.paused) {
         clearAutoTimer();
-        player.pause();
+        stopCurrentPlayback();
       } else if (sessionMode === "auto") {
+        stopCurrentPlayback();
         const rp = await api("/api/replay", { method: "POST" });
         playUrls(rp.audio_urls, () => {
           if (sessionMode === "auto" && !autoPaused) scheduleAutoNext();
@@ -585,7 +639,7 @@
     clearAutoTimer();
     autoPaused = true;
     sessionActive = false;
-    player.pause();
+    stopCurrentPlayback();
     setDictationModeDisabled(false);
     updateModeControlsState();
     clearSpellWordState();
@@ -775,13 +829,17 @@
 
   async function spellSubmitFromUi() {
     if (!sessionActive || currentDictationMode() !== "en_spell") return;
+    if (spellSubmitting) return;
     const raw = $("spellInput").value;
     if (!String(raw).trim()) {
       setStatus("请先输入拼写再确认。");
       return;
     }
+    spellSubmitting = true;
     try {
       await api("/api/spell/submit", { method: "POST", body: { text: raw } });
+      clearAutoTimer();
+      await postNextAndHandle(false);
     } catch (err) {
       const m = err && err.message ? String(err.message) : "";
       if (/not\s*found/i.test(m) || m === "404") {
@@ -789,10 +847,9 @@
       } else {
         setStatus(m || "提交失败");
       }
-      return;
+    } finally {
+      spellSubmitting = false;
     }
-    clearAutoTimer();
-    await postNextAndHandle();
   }
 
   $("btnSpellConfirm").addEventListener("click", function () {
@@ -806,15 +863,9 @@
 
   const PREF_DM_KEY = "dictation.pref.dictationMode";
   async function applyPreferredSettings() {
-    const preferredDm = localStorage.getItem(PREF_DM_KEY);
-    if (
-      preferredDm &&
-      (preferredDm === "en_to_zh" || preferredDm === "zh_to_en" || preferredDm === "en_spell")
-    ) {
-      const dmEl = document.querySelector(`input[name="dictation_mode"][value="${preferredDm}"]`);
-      if (dmEl) dmEl.checked = true;
-      await api("/api/settings", { method: "POST", body: { dictation_mode: preferredDm } }).catch(() => {});
-    }
+    // 保留本地键仅为兼容旧版本，当前统一固定电脑拼写。
+    localStorage.setItem(PREF_DM_KEY, "en_spell");
+    await api("/api/settings", { method: "POST", body: { dictation_mode: "en_spell" } }).catch(() => {});
   }
 
   loadConfig()

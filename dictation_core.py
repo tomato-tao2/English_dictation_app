@@ -6,8 +6,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import random
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -69,32 +71,96 @@ QUIZ_MODES: tuple[str, ...] = ("en_pick_zh", "en_recall")
 
 EDGE_VOICE_EN = "en-US-AriaNeural"
 EDGE_VOICE_ZH = "zh-CN-XiaoxiaoNeural"
+EDGE_RATE_EN = "-8%"
+EDGE_RATE_ZH = "+0%"
 
 
-def edge_voice_for(language: str) -> str:
-    return EDGE_VOICE_ZH if language == "zh" else EDGE_VOICE_EN
+def edge_profile_for(language: str) -> tuple[str, str]:
+    if language == "zh":
+        return EDGE_VOICE_ZH, EDGE_RATE_ZH
+    return EDGE_VOICE_EN, EDGE_RATE_EN
 
 
-def edge_cache_path(text: str, voice: str) -> Path:
-    key = hashlib.sha256(f"{voice}\0{text}".encode("utf-8")).hexdigest()
+def edge_cache_path(text: str, voice: str, rate: str) -> Path:
+    key = hashlib.sha256(f"{voice}\0{rate}\0{text}".encode("utf-8")).hexdigest()
     return TTS_CACHE_DIR / f"{key}.mp3"
 
 
-def edge_synthesize_to_file(text: str, voice: str, path: Path) -> None:
+def edge_synthesize_to_file(text: str, voice: str, rate: str, path: Path) -> None:
     async def _run() -> None:
-        communicate = edge_tts.Communicate(text, voice)
+        communicate = edge_tts.Communicate(text, voice, rate=rate)
         await communicate.save(str(path))
 
     asyncio.run(_run())
 
 
+def _normalize_tts_text(text: str, language: str) -> str:
+    t = str(text or "").strip()
+    if not t:
+        return ""
+    # 英文单词尾音更清晰：适当停顿，避免尾音被吞。
+    if language == "en" and re.fullmatch(r"[A-Za-z][A-Za-z'-]*", t):
+        return f"{t}."
+    return t
+
+
+def _cache_mp3_healthy(path: Path) -> bool:
+    try:
+        if not path.is_file():
+            return False
+        # 过小文件通常是失败产物，浏览器会报 unsupported source。
+        return path.stat().st_size >= 900
+    except OSError:
+        return False
+
+
+def _safe_regenerate_tts(text: str, voice: str, rate: str, path: Path) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    lock = path.with_suffix(path.suffix + ".lock")
+    TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+        try:
+            if tmp.exists():
+                tmp.unlink()
+            edge_synthesize_to_file(text, voice, rate, tmp)
+            if not _cache_mp3_healthy(tmp):
+                raise RuntimeError("TTS 结果文件异常")
+            os.replace(str(tmp), str(path))
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+    except FileExistsError:
+        # 另一请求正在生成，短暂等待其完成。
+        for _ in range(40):
+            if _cache_mp3_healthy(path):
+                return
+            time.sleep(0.05)
+        # 等待后仍无有效文件，则本请求直接尝试重建。
+        if lock.exists():
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+        _safe_regenerate_tts(text, voice, rate, path)
+
+
 def ensure_tts_mp3(text: str, language: str) -> Path:
     """Return path to cached mp3; synthesize if missing."""
     TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    voice = edge_voice_for(language)
-    path = edge_cache_path(text, voice)
-    if not path.is_file():
-        edge_synthesize_to_file(text, voice, path)
+    normalized_text = _normalize_tts_text(text, language)
+    voice, rate = edge_profile_for(language)
+    path = edge_cache_path(normalized_text, voice, rate)
+    if not _cache_mp3_healthy(path):
+        _safe_regenerate_tts(normalized_text, voice, rate, path)
     return path
 
 
@@ -420,10 +486,17 @@ def spell_hint_segment(word: dict, click_index: int) -> tuple[str, str]:
     """
     m = word_mnemonic(word)
     ans = spell_answer_line(word)
-    if click_index % 2 == 1:
+    en = str(word.get("en", "")).strip()
+    spelling = "-".join(list(en)) if en else ""
+    step = click_index % 3
+    if step == 1:
         if m:
             return m, "mnemonic"
         return "暂无巧记", "mnemonic_empty"
+    if step == 2:
+        if spelling:
+            return spelling, "spelling"
+        return ans, "answer"
     return ans, "answer"
 
 

@@ -34,7 +34,8 @@ USE_USER_ACCOUNTS = os.environ.get("USE_USER_ACCOUNTS", "1").strip().lower() in 
 if USE_USER_ACCOUNTS:
     us.init_db()
 
-_DICTATION_MODES = ("en_to_zh", "zh_to_en", "en_spell")
+# 2026-04-29：网页端听写固定为「听英文·电脑拼写」
+_DICTATION_MODES = ("en_spell",)
 
 # 拼写会话逐词统计（仅内存；键为 session 内 spell_log_id，避免大列表进 Cookie）
 SPELL_SESSION_BUFFERS: dict[str, list] = {}
@@ -198,7 +199,7 @@ def _session_defaults():
     session.setdefault("unit", "全部单元")
     session.setdefault("lesson", "全部部分")
     session.setdefault("mode", "manual")
-    session.setdefault("dictation_mode", "en_to_zh")
+    session["dictation_mode"] = "en_spell"
     session.setdefault("interval", 10)
     session.setdefault("index", 0)
     session.setdefault("session_active", False)
@@ -228,6 +229,7 @@ def _reset_session_on_library_switch() -> None:
     session["auto_paused"] = False
     session.pop("spell_last_attempt", None)
     session.pop("spell_last_correct", None)
+    session.pop("spell_submitted_index", None)
     session.pop("spell_hint_clicks", None)
     session.pop("zh_sense_seq", None)
     _clear_quiz_session()
@@ -531,8 +533,8 @@ def api_settings():
         session["lesson"] = str(data["lesson"])
     if "mode" in data and data["mode"] in ("manual", "auto"):
         session["mode"] = data["mode"]
-    if "dictation_mode" in data and data["dictation_mode"] in _DICTATION_MODES:
-        session["dictation_mode"] = data["dictation_mode"]
+    # 统一固定为拼写模式，前端不再提供切换
+    session["dictation_mode"] = "en_spell"
     if "interval" in data:
         try:
             iv = int(data["interval"])
@@ -658,6 +660,11 @@ def _take_spell_summary_and_clear_buffer() -> dict | None:
         for r in rows
         if r.get("submitted") and r.get("correct") is False
     ]
+    correct_rows = [
+        {"en": r["en"], "zh": r["zh"], "attempt": r.get("attempt", "")}
+        for r in rows
+        if r.get("submitted") and r.get("correct") is True
+    ]
     unsubmitted_rows = [{"en": r["en"], "zh": r["zh"]} for r in rows if not r.get("submitted")]
     hint_rows = [
         {"en": r["en"], "zh": r["zh"], "hint_count": int(r.get("hint_count", 0))}
@@ -672,6 +679,7 @@ def _take_spell_summary_and_clear_buffer() -> dict | None:
             "hint_used_words": hint_used_words,
         },
         "wrong_rows": wrong_rows,
+        "correct_rows": correct_rows,
         "unsubmitted_rows": unsubmitted_rows,
         "hint_rows": hint_rows,
     }
@@ -759,7 +767,7 @@ def _next_zh_sense_index() -> int:
     return v
 
 
-def _prompt_urls(word: dict) -> list[str]:
+def _prompt_urls(word: dict, repeat: int = 2) -> list[str]:
     dm = session.get("dictation_mode", "en_to_zh")
     sense_i = _next_zh_sense_index() if dm == "zh_to_en" else None
     text, lang = dc.prompt_text_and_language(word, dm, sense_i)
@@ -768,7 +776,8 @@ def _prompt_urls(word: dict) -> list[str]:
     path = dc.ensure_tts_mp3(text, lang)
     digest = path.stem
     u = url_for("serve_audio", digest=digest)
-    return [u, u]
+    n = max(1, int(repeat))
+    return [u] * n
 
 
 def _resume_payload_from_record(record: dict) -> tuple[dict | None, str | None]:
@@ -804,11 +813,12 @@ def _resume_payload_from_record(record: dict) -> tuple[dict | None, str | None]:
     _reset_spell_hint_clicks()
     session.pop("spell_last_attempt", None)
     session.pop("spell_last_correct", None)
+    session["spell_submitted_index"] = -1
     _clear_spell_session_log()
     if session.get("dictation_mode") == "en_spell":
         _init_spell_session_log()
     word = filtered[resolved]
-    urls = _prompt_urls(word)
+    urls = _prompt_urls(word, repeat=2)
     payload = {
         "ok": True,
         "index": resolved,
@@ -833,8 +843,8 @@ def api_start():
         session["lesson"] = str(data["lesson"])
     if "mode" in data and data["mode"] in ("manual", "auto"):
         session["mode"] = data["mode"]
-    if "dictation_mode" in data and data["dictation_mode"] in _DICTATION_MODES:
-        session["dictation_mode"] = data["dictation_mode"]
+    # 统一固定为拼写模式，前端不再提供切换
+    session["dictation_mode"] = "en_spell"
     if "interval" in data:
         try:
             iv = int(data["interval"])
@@ -855,11 +865,12 @@ def api_start():
     _reset_spell_hint_clicks()
     session.pop("spell_last_attempt", None)
     session.pop("spell_last_correct", None)
+    session["spell_submitted_index"] = -1
     _clear_spell_session_log()
     if session.get("dictation_mode") == "en_spell":
         _init_spell_session_log()
     word = filtered[0]
-    urls = _prompt_urls(word)
+    urls = _prompt_urls(word, repeat=2)
     total = len(filtered)
     return jsonify(
         {
@@ -879,12 +890,19 @@ def api_next():
     _session_defaults()
     if not session.get("session_active", False):
         return jsonify({"error": "已退出或未开始听写，请点击「开始」重新开始。"}), 400
+    data = request.get_json(force=True, silent=True) or {}
+    force_next = bool(data.get("force", False))
     filtered = _current_filtered()
     if not filtered:
         return jsonify({"error": "没有单词"}), 400
     idx = session.get("index", 0)
     unit = session.get("unit", "全部单元")
     lesson = session.get("lesson", "全部部分")
+
+    if session.get("dictation_mode") == "en_spell":
+        submitted_idx = int(session.get("spell_submitted_index", -1))
+        if (not force_next) and submitted_idx != int(idx):
+            return jsonify({"error": "请先点击「确认」或按 Enter 提交当前拼写。"}), 400
 
     if idx >= len(filtered) - 1:
         _finalize_current_spell_row(filtered, idx)
@@ -906,8 +924,10 @@ def api_next():
     _finalize_current_spell_row(filtered, idx)
     session["index"] = idx + 1
     _reset_spell_hint_clicks()
+    session["spell_submitted_index"] = -1
     word = filtered[session["index"]]
-    urls = _prompt_urls(word)
+    # 手动点“下一个”时只播一遍，减少等待感
+    urls = _prompt_urls(word, repeat=1)
     return jsonify(
         {
             "ok": True,
@@ -929,7 +949,7 @@ def api_replay():
     if not filtered or not (0 <= idx < len(filtered)):
         return jsonify({"error": "请先开始听写"}), 400
     word = filtered[idx]
-    urls = _prompt_urls(word)
+    urls = _prompt_urls(word, repeat=2)
     return jsonify({"audio_urls": urls, "status": f"第 {idx + 1} 个单词"})
 
 
@@ -982,6 +1002,7 @@ def api_spell_submit():
     ok = dc.spell_attempt_matches_word(word, text)
     session["spell_last_attempt"] = text
     session["spell_last_correct"] = ok
+    session["spell_submitted_index"] = int(idx)
     return jsonify({"ok": True, "recorded": True})
 
 
@@ -1195,6 +1216,7 @@ def api_exit():
     dc.save_last_progress(unit, lesson, word=word, index=idx, status="exited")
     session["session_active"] = False
     session["auto_paused"] = True
+    session["spell_submitted_index"] = -1
 
     word_en = str(word.get("en", "")).strip() if word else ""
     word_zh = dc.format_all_senses_zh(word) if word else ""
